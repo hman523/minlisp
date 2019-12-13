@@ -17,17 +17,90 @@ enum Expr {
     List(LinkedList<Expr>),
 }
 
-/// Error Enum
-/// This enum is used for reporting errors
-/// They all contain a string for the variable part of the error and
-/// an option<usize> to indicate the line number if there is one
-enum Error {
-    TypeError(String, Option<usize>),
-    NotAProcedure(String, Option<usize>),
-    ArityMismatch(String, Option<usize>),
-    CloseParenMissing(String, Option<usize>),
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.clone() {
+            Expr::Var(x) => unimplemented!(), //write!(f, "{}", x),
+            Expr::Str(s) => write!(f, "{}", s),
+            Expr::Bool(b) => write!(f, "#{}", (if b { "t" } else { "f" })),
+            Expr::Num(n) => write!(f, "{}", n),
+            Expr::Func(_) => Err(std::fmt::Error),
+            Expr::List(l) => unimplemented!(), //write!(f, "{}", l),
+        }
+    }
 }
 
+fn get_type_name(e: Expr) -> String {
+	match e{
+		Expr::Var(_) => "Variable",
+		Expr::Str(_) => "String",
+		Expr::Bool(_) => "Bool",
+		Expr::Num(_) => "Num",
+		Expr::Func(_) => "Function",
+		Expr::List(_) => "List",
+	}.to_string()
+}
+
+/// Error Enum
+/// This enum is used for reporting errors
+/// Some contain a string for the variable part of the error and
+/// an option<usize> to indicate the line number if there is one
+#[derive(Clone)]
+enum Error {
+    //fn name, given variable, expected type
+    TypeError(String, Expr, String, Option<usize>),
+    //fn name
+    NotAProcedure(String, Option<usize>),
+    //fn name, given number of params, expected number
+    ArityMismatch(String, usize, usize, Option<usize>),
+    CloseParenMissing(Option<usize>),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+ 		match self.clone() {
+			Error::TypeError(func, given, expected, line) => {
+				let on_line = match line {
+					Some(x) => format!(" on line {}", x),
+					None => String::new()
+				};
+				 write!(f, "Type error in function {}{}
+					\tExpected type:{}
+					\tGiven type:{}", 
+					func, 
+					on_line, 
+					expected, 
+					get_type_name(given))
+			},
+			Error::NotAProcedure(func, line) => {
+				let on_line = match line {
+					Some(x) => format!(" on line {}", x),
+					None => String::new()
+				};
+				write!(f, 
+				"Unable to call {}, function not found{}", 
+				func, 
+				on_line)
+			},
+			Error::ArityMismatch(func, given, expected, line) => {
+				let on_line = match line {
+					Some(x) => format!(" on line {}", x),
+					None => String::new()
+				};
+				write!(f,
+				"Arity mismatch error in {}{}
+				\tGiven parameters: {}
+				\tExpected parameters: {}", func, on_line, given, expected)
+			},
+			Error::CloseParenMissing(line) => {
+				match line {
+					Some(x) => write!(f, "Parentheis mismatch on line {}", x),
+					None => write!(f, "Parenthesis mismatch"),
+				}
+			}
+		}
+ }
+}
 /// Tokenize function
 /// This function just gets an input (String) and returns
 /// a tokenized result (a vector of strings, either a token or parenthesis)
@@ -108,4 +181,16 @@ mod tests {
         assert_eq!(tokenize(String::from("\"((((")), vec!["\"(((("]);
         assert_eq!(tokenize(String::from("((((")), vec!["(", "(", "(", "("]);
     }
+
+    #[test]
+    fn type_format() {
+        assert_eq!(Expr::Bool(true).to_string(), "#t");
+        assert_eq!(Expr::Bool(false).to_string(), "#f");
+        assert_eq!(Expr::Str("A".to_string()).to_string(), "A");
+		assert_eq!(Expr::Num(-1.0).to_string(), "-1");
+		assert_eq!(Expr::Num(0.5).to_string(), "0.5");
+    }
+
+    #[test]
+    fn error_format() {}
 }
