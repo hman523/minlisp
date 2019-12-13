@@ -176,12 +176,18 @@ fn parse_expr(token: String) -> Expr {
         return Expr::Bool(false);
     } else if is_in_quotes(&token) {
         return Expr::Str(token[1..token.len()].to_string());
+    } else {
+        let parsed = token.parse::<f64>();
+        return match parsed {
+            Ok(x) => Expr::Num(x),
+            Err(_) => Expr::Var(token),
+        };
     }
     panic!("Implementation error in parsing")
 }
 
 fn parse(tokens: Tokens) -> Expr {
-    Expr::Bool(true)
+    unimplemented!()
 }
 
 #[cfg(test)]
@@ -215,7 +221,4 @@ mod tests {
         assert_eq!(Expr::Num(-1.0).to_string(), "-1");
         assert_eq!(Expr::Num(0.5).to_string(), "0.5");
     }
-
-    #[test]
-    fn error_format() {}
 }
