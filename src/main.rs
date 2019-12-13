@@ -37,34 +37,48 @@ fn tokenize(code: String) -> Vec<String> {
     let mut in_quotes = false;
     let mut last_escaped = false;
     for i in code.chars() {
-        if i == ' ' {
-            v.push(cur.clone());
-        } else if i == '(' {
+        if i == ' ' && !in_quotes {
             if !cur.is_empty() {
-                v.push(cur);
+                v.push(cur.clone());
+                cur = String::new();
+            } else {
+                //do nothing
+            }
+        } else if i == '(' && !in_quotes {
+            if !cur.is_empty() {
+                v.push(cur.clone());
+                cur = String::new()
             }
             v.push(String::from("("));
-        } else if i == ')' {
+        } else if i == ')' && !in_quotes {
             if !cur.is_empty() {
-                v.push(cur);
+                v.push(cur.clone());
+                cur = String::new();
             }
             v.push(String::from(")"));
         } else if i == '"' && !last_escaped {
             if in_quotes {
                 cur.push('"');
-                v.push(cur);
+                v.push(cur.clone());
+                cur = String::new();
             } else {
                 cur.push('"');
             }
             in_quotes = !in_quotes;
-        } else if i == '"' && last_escaped {
-        } else {
-            if !cur.is_empty() {
-                cur.push(i);
-            }
             continue;
+        } else if i == '"' && last_escaped {
+            cur.push('"');
+        } else if i == '\\' {
+            if last_escaped {
+                cur.push('\\');
+            } else {
+                last_escaped = true;
+                continue;
+            }
+        } else {
+            cur.push(i);
         }
-        cur = String::new();
+        last_escaped = false;
     }
     if !cur.is_empty() {
         v.push(cur);
@@ -87,7 +101,11 @@ mod tests {
         assert_eq!(tokenize(String::from("( 1 2 )")), vec!["(", "1", "2", ")"]);
         assert_eq!(tokenize(String::from("     1")), vec!["1"]);
         assert_eq!(tokenize(String::from("")), empty);
-        assert_eq!(tokenize(String::from("\"hi \"")), vec!["hi "]);
+        assert_eq!(tokenize(String::from("1       ")), vec!["1"]);
+        assert_eq!(tokenize(String::from("\"1 2\"")), vec!["\"1 2\""]);
+        assert_eq!(tokenize(String::from("\"12 2\"")), vec!["\"12 2\""]);
         assert_eq!(tokenize(String::from("\\\"")), vec!["\""]);
+        assert_eq!(tokenize(String::from("\"((((")), vec!["\"(((("]);
+        assert_eq!(tokenize(String::from("((((")), vec!["(", "(", "(", "("]);
     }
 }
