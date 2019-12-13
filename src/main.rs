@@ -1,5 +1,7 @@
 use std::collections::LinkedList;
 
+type Tokens = Vec<String>;
+
 fn main() {
     println!("minlisp interpreter");
 }
@@ -31,14 +33,15 @@ impl std::fmt::Display for Expr {
 }
 
 fn get_type_name(e: Expr) -> String {
-	match e{
-		Expr::Var(_) => "Variable",
-		Expr::Str(_) => "String",
-		Expr::Bool(_) => "Bool",
-		Expr::Num(_) => "Num",
-		Expr::Func(_) => "Function",
-		Expr::List(_) => "List",
-	}.to_string()
+    match e {
+        Expr::Var(_) => "Variable",
+        Expr::Str(_) => "String",
+        Expr::Bool(_) => "Bool",
+        Expr::Num(_) => "Num",
+        Expr::Func(_) => "Function",
+        Expr::List(_) => "List",
+    }
+    .to_string()
 }
 
 /// Error Enum
@@ -58,53 +61,54 @@ enum Error {
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
- 		match self.clone() {
-			Error::TypeError(func, given, expected, line) => {
-				let on_line = match line {
-					Some(x) => format!(" on line {}", x),
-					None => String::new()
-				};
-				 write!(f, "Type error in function {}{}
+        match self.clone() {
+            Error::TypeError(func, given, expected, line) => {
+                let on_line = match line {
+                    Some(x) => format!(" on line {}", x),
+                    None => String::new(),
+                };
+                write!(
+                    f,
+                    "Type error in function {}{}
 					\tExpected type:{}
-					\tGiven type:{}", 
-					func, 
-					on_line, 
-					expected, 
-					get_type_name(given))
-			},
-			Error::NotAProcedure(func, line) => {
-				let on_line = match line {
-					Some(x) => format!(" on line {}", x),
-					None => String::new()
-				};
-				write!(f, 
-				"Unable to call {}, function not found{}", 
-				func, 
-				on_line)
-			},
-			Error::ArityMismatch(func, given, expected, line) => {
-				let on_line = match line {
-					Some(x) => format!(" on line {}", x),
-					None => String::new()
-				};
-				write!(f,
-				"Arity mismatch error in {}{}
+					\tGiven type:{}",
+                    func,
+                    on_line,
+                    expected,
+                    get_type_name(given)
+                )
+            }
+            Error::NotAProcedure(func, line) => {
+                let on_line = match line {
+                    Some(x) => format!(" on line {}", x),
+                    None => String::new(),
+                };
+                write!(f, "Unable to call {}, function not found{}", func, on_line)
+            }
+            Error::ArityMismatch(func, given, expected, line) => {
+                let on_line = match line {
+                    Some(x) => format!(" on line {}", x),
+                    None => String::new(),
+                };
+                write!(
+                    f,
+                    "Arity mismatch error in {}{}
 				\tGiven parameters: {}
-				\tExpected parameters: {}", func, on_line, given, expected)
-			},
-			Error::CloseParenMissing(line) => {
-				match line {
-					Some(x) => write!(f, "Parentheis mismatch on line {}", x),
-					None => write!(f, "Parenthesis mismatch"),
-				}
-			}
-		}
- }
+				\tExpected parameters: {}",
+                    func, on_line, given, expected
+                )
+            }
+            Error::CloseParenMissing(line) => match line {
+                Some(x) => write!(f, "Parentheis mismatch on line {}", x),
+                None => write!(f, "Parenthesis mismatch"),
+            },
+        }
+    }
 }
 /// Tokenize function
 /// This function just gets an input (String) and returns
 /// a tokenized result (a vector of strings, either a token or parenthesis)
-fn tokenize(code: String) -> Vec<String> {
+fn tokenize(code: String) -> Tokens {
     let mut v = Vec::new();
     let mut cur = String::new();
     let mut in_quotes = false;
@@ -159,6 +163,27 @@ fn tokenize(code: String) -> Vec<String> {
     return v;
 }
 
+fn is_in_quotes(s: &String) -> bool {
+    s.len() >= 2
+        && (s.clone().into_bytes()[0] as char) == '"'
+        && (s.clone().into_bytes()[s.len() - 1] as char) == '"'
+}
+
+fn parse_expr(token: String) -> Expr {
+    if token == "#t" {
+        return Expr::Bool(true);
+    } else if token == "#f" {
+        return Expr::Bool(false);
+    } else if is_in_quotes(&token) {
+        return Expr::Str(token[1..token.len()].to_string());
+    }
+    panic!("Implementation error in parsing")
+}
+
+fn parse(tokens: Tokens) -> Expr {
+    Expr::Bool(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,8 +212,8 @@ mod tests {
         assert_eq!(Expr::Bool(true).to_string(), "#t");
         assert_eq!(Expr::Bool(false).to_string(), "#f");
         assert_eq!(Expr::Str("A".to_string()).to_string(), "A");
-		assert_eq!(Expr::Num(-1.0).to_string(), "-1");
-		assert_eq!(Expr::Num(0.5).to_string(), "0.5");
+        assert_eq!(Expr::Num(-1.0).to_string(), "-1");
+        assert_eq!(Expr::Num(0.5).to_string(), "0.5");
     }
 
     #[test]
