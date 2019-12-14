@@ -1,9 +1,14 @@
 use std::collections::LinkedList;
+use std::collections::HashMap;
 
 type Tokens = Vec<String>;
 
 fn main() {
     println!("minlisp interpreter");
+}
+
+struct Memory {
+	vars: HashMap<String,Expr>,
 }
 
 /// Expr Enum
@@ -22,7 +27,7 @@ enum Expr {
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.clone() {
-            Expr::Var(x) => unimplemented!(), //write!(f, "{}", x),
+            Expr::Var(name) => write!(f, "{}", name),
             Expr::Str(s) => write!(f, "{}", s),
             Expr::Bool(b) => write!(f, "#{}", (if b { "t" } else { "f" })),
             Expr::Num(n) => write!(f, "{}", n),
@@ -183,11 +188,43 @@ fn parse_expr(token: String) -> Expr {
             Err(_) => Expr::Var(token),
         };
     }
-    panic!("Implementation error in parsing")
 }
 
-fn parse(tokens: Tokens) -> Expr {
-    unimplemented!()
+fn parse(tokens: Tokens) -> Vec<Expr> {
+    if tokens.len() == 1 {
+		return vec![parse_expr(tokens.get(0).unwrap().to_string())];
+	}
+	let mut lines: Vec<Expr> = Vec::new();
+	let mut line = LinkedList::new();
+	let mut currentlist = LinkedList::new();
+	for t in tokens {
+		if t == "(" {
+			if currentline.is_empty() {
+			
+			}
+			else {
+			
+			}
+		}
+		else if t == ")" {
+			if currentlist.is_empty() {
+				lines.push_back(l);
+				line = LinkedList::new();
+			}
+			else {
+				let l = Expr::List(currentlist);
+
+			}
+
+				let l = Expr::List(currentlist);
+			line.push_back(l);
+			currentlist = LinkedList::new();
+		}
+		else{
+			let e = parse_expr(t);
+			currentlist.push_back(e);
+		}
+	}
 }
 
 #[cfg(test)]
