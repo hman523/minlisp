@@ -208,19 +208,23 @@ fn tokenize(code: String) -> Result<Tokens, Error> {
     }
 }
 
+/// is_in_quotes function
+/// Checks if the string starts and ends with a quotes character
 fn is_in_quotes(s: &String) -> bool {
     s.len() >= 2
         && (s.clone().into_bytes()[0] as char) == '"'
         && (s.clone().into_bytes()[s.len() - 1] as char) == '"'
 }
 
+/// parse_expr function
+/// Function converts a string into either a string, variable, boolean, or number
 fn parse_expr(token: String) -> Expr {
     if token == "#t" {
         Expr::Bool(true)
     } else if token == "#f" {
         Expr::Bool(false)
     } else if is_in_quotes(&token) {
-        Expr::Str(token[1..token.len()].to_string())
+        Expr::Str(token[1..(token.len() - 1)].to_string())
     } else {
         let parsed = token.parse::<f64>();
         match parsed {
@@ -229,9 +233,17 @@ fn parse_expr(token: String) -> Expr {
         }
     }
 }
-/**
-fn parse(tokens: Tokens) -> Vec<Expr> {
-    if tokens.len() == 1 {
+
+/// parse function
+/// This function converts tokens into a valid vector of expressions
+/// Each element in the vector is another line in the code
+/// The code would be parsed from `(print "hi") (print "bye")` to
+/// ```vec![Expr::List(vec![Expr::Func("print"), Expr::Str("hi")]),
+/// Expr::List(vec![Expr::Func("print"), Expr::Str("bye")])]```
+fn parse(tokens: Tokens) -> Result<Vec<Expr>, Error> {
+    return Ok(vec![Expr::Bool(true)]);
+
+    /*if tokens.len() == 1 {
         return vec![parse_expr(tokens.get(0).unwrap().to_string())];
     }
     let mut lines: Vec<Expr> = Vec::new();
@@ -257,8 +269,8 @@ fn parse(tokens: Tokens) -> Vec<Expr> {
             let e = parse_expr(t);
             currentlist.push_back(e);
         }
-    }
-}**/
+    }**/
+}
 
 #[cfg(test)]
 mod tests {
@@ -323,5 +335,9 @@ mod tests {
         assert_eq!(parse_expr(String::from("-1")), Expr::Num(-1.0));
         assert_eq!(parse_expr(String::from("-1.0")), Expr::Num(-1.0));
         assert_eq!(parse_expr(String::from("-1.0000")), Expr::Num(-1.0));
+        assert_eq!(
+            parse_expr("\"aaa\"".to_string()),
+            Expr::Str(String::from("aaa"))
+        );
     }
 }
