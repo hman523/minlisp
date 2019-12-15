@@ -11,6 +11,29 @@ struct Memory {
     vars: HashMap<String, Expr>,
 }
 
+impl Memory {
+    pub fn new() -> Memory {
+        Memory {
+            vars: HashMap::new(),
+        }
+    }
+
+    pub fn get(&self, s: &String) -> Result<Expr, Error> {
+        match self.vars.get(s).ok_or(Error::NotAVariable(s.to_string())) {
+            Ok(e) => Ok((*e).clone()),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn insert(&mut self, s: &String, e: Expr) -> Result<(), Error> {
+        let exists = self.vars.insert(s.clone(), e);
+        match exists {
+            Some(_) => Err(Error::RedefiningVar(s.clone())),
+            None => Ok(()),
+        }
+    }
+}
+
 /// Expr Enum
 /// Essentially, these are all the possible types this lisp can have
 /// Their name should be easy to determine what they do
@@ -82,6 +105,8 @@ enum Error {
     TypeError(String, Expr, String, Option<usize>),
     //fn name
     NotAProcedure(String, Option<usize>),
+    NotAVariable(String),
+    RedefiningVar(String),
     //fn name, given number of params, expected number
     ArityMismatch(String, usize, usize, Option<usize>),
     CloseParenMissing(Option<usize>),
@@ -114,6 +139,8 @@ impl std::fmt::Display for Error {
                 };
                 write!(f, "Unable to call {}, function not found{}", func, on_line)
             }
+            Error::NotAVariable(name) => write!(f, "Variable {} does not exist", name),
+            Error::RedefiningVar(name) => write!(f, "Cannot redeclare variable {}", name),
             Error::ArityMismatch(func, given, expected, line) => {
                 let on_line = match line {
                     Some(x) => format!(" on line {}", x),
@@ -373,5 +400,21 @@ mod tests {
         list.push_back(Expr::Num(3.0));
         let expected = Expr::Lines(vec![Expr::List(first), Expr::List(list)]);
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_memory_get_insert() {
+        let mut mem = Memory::new();
+        mem.insert(&String::from("a"), Expr::Bool(true));
+        assert_eq!(mem.get(&String::from("a")).unwrap(), Expr::Bool(true));
+    }
+
+    #[test]
+    fn test_memory_insert_twice() {
+        let mut mem = Memory::new();
+        let first = mem.insert(&String::from("a"), Expr::Bool(true)).unwrap();
+        let second = mem.insert(&String::from("a"), Expr::Bool(true));
+        assert_eq!(first, ());
+        assert_eq!(second, Err(Error::RedefiningVar(String::from("a"))));
     }
 }
