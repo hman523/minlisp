@@ -403,6 +403,29 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_03() {
+        let tokens = tokenize(String::from("((1) 2 3)"));
+        let tokens = match tokens {
+            Ok(a) => a,
+            Err(e) => panic!(e),
+        };
+        let result = parse(tokens);
+        let result = match result {
+            Ok(a) => a,
+            Err(e) => panic!(e),
+        };
+        let mut list: LinkedList<Expr> = LinkedList::new();
+        list.push_back(Expr::Num(1.0));
+        let inner = Expr::List(list);
+        let mut list: LinkedList<Expr> = LinkedList::new();
+        list.push_back(inner);
+        list.push_back(Expr::Num(2.0));
+        list.push_back(Expr::Num(3.0));
+        let expected = Expr::Lines(vec![Expr::List(list)]);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
     fn test_memory_get_insert() {
         let mut mem = Memory::new();
         mem.insert(&String::from("a"), Expr::Bool(true));
