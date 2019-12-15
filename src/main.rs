@@ -31,7 +31,7 @@ impl std::cmp::PartialEq for Expr {
             (Expr::Str(a), Expr::Str(b)) => a == b,
             (Expr::Bool(a), Expr::Bool(b)) => a == b,
             (Expr::Num(a), Expr::Num(b)) => a == b,
-            (Expr::Func(f), Expr::Func(g)) => unimplemented!(),
+            (Expr::Func(_), Expr::Func(_)) => unimplemented!(),
             (Expr::List(a), Expr::List(b)) => a == b,
             _ => false,
         }
@@ -46,7 +46,7 @@ impl std::fmt::Display for Expr {
             Expr::Bool(b) => write!(f, "#{}", (if b { "t" } else { "f" })),
             Expr::Num(n) => write!(f, "{}", n),
             Expr::Func(_) => Err(std::fmt::Error),
-            Expr::List(l) => unimplemented!(), //write!(f, "{}", l),
+            Expr::List(_l) => unimplemented!(), //write!(f, "{}", l),
         }
     }
 }
@@ -166,14 +166,14 @@ fn tokenize(code: String) -> Result<Tokens, Error> {
                 cur = String::new()
             }
             v.push(String::from("("));
-            paren_count = paren_count + 1;
+            paren_count += 1;
         } else if i == ')' && !in_quotes {
             if !cur.is_empty() {
                 v.push(cur.clone());
                 cur = String::new();
             }
             v.push(String::from(")"));
-            paren_count = paren_count - 1;
+            paren_count -= 1;
         } else if i == '"' && !last_escaped {
             if in_quotes {
                 cur.push('"');
@@ -216,17 +216,17 @@ fn is_in_quotes(s: &String) -> bool {
 
 fn parse_expr(token: String) -> Expr {
     if token == "#t" {
-        return Expr::Bool(true);
+        Expr::Bool(true)
     } else if token == "#f" {
-        return Expr::Bool(false);
+        Expr::Bool(false)
     } else if is_in_quotes(&token) {
-        return Expr::Str(token[1..token.len()].to_string());
+        Expr::Str(token[1..token.len()].to_string())
     } else {
         let parsed = token.parse::<f64>();
-        return match parsed {
+        match parsed {
             Ok(x) => Expr::Num(x),
             Err(_) => Expr::Var(token),
-        };
+        }
     }
 }
 /**
