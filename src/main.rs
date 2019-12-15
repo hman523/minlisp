@@ -22,6 +22,7 @@ enum Expr {
     Num(f64),
     Func(fn(&[Expr]) -> Result<Expr, Error>),
     List(LinkedList<Expr>),
+	Lines(Vec<Expr>),
 }
 
 impl std::cmp::PartialEq for Expr {
@@ -46,7 +47,8 @@ impl std::fmt::Display for Expr {
             Expr::Bool(b) => write!(f, "#{}", (if b { "t" } else { "f" })),
             Expr::Num(n) => write!(f, "{}", n),
             Expr::Func(_) => Err(std::fmt::Error),
-            Expr::List(_l) => unimplemented!(), //write!(f, "{}", l),
+            Expr::List(l) => write!(f, "{:?}", l),
+			Expr::Lines(l) => write!(f, "{:?}", l),
         }
     }
 }
@@ -65,6 +67,7 @@ fn get_type_name(e: Expr) -> String {
         Expr::Num(_) => "Num",
         Expr::Func(_) => "Function",
         Expr::List(_) => "List",
+		Expr::Lines(_) => "Lines",
     }
     .to_string()
 }
@@ -240,36 +243,28 @@ fn parse_expr(token: String) -> Expr {
 /// The code would be parsed from `(print "hi") (print "bye")` to
 /// ```vec![Expr::List(vec![Expr::Func("print"), Expr::Str("hi")]),
 /// Expr::List(vec![Expr::Func("print"), Expr::Str("bye")])]```
-fn parse(tokens: Tokens) -> Result<Vec<Expr>, Error> {
-    return Ok(vec![Expr::Bool(true)]);
+fn parse(tokens: Tokens) -> Result<Expr, Error> {
+    let mut code: Vec<Expr> = Vec::new();
+	let mut line: LinkedList<Expr> = LinkedList::new();
+	for i in 0..tokens.len() {
+		if tokens[i] == "(" {
+			let inner = parse(tokens[1..].to_vec());
+			if inner.is_ok() {
+				code.push(inner.unwrap());
+			} else {
+				return inner;
+			}
+		}
+		else if tokens[i] == ")" {
+			return Ok(Expr::List(line));
+		}
+		else {
+			let e = parse_expr(tokens[i].clone());
+			line.push_back(e);
+		}
 
-    /*if tokens.len() == 1 {
-        return vec![parse_expr(tokens.get(0).unwrap().to_string())];
-    }
-    let mut lines: Vec<Expr> = Vec::new();
-    let mut line = LinkedList::new();
-    let mut currentlist = LinkedList::new();
-    for t in tokens {
-        if t == "(" {
-            if currentline.is_empty() {
-            } else {
-            }
-        } else if t == ")" {
-            if currentlist.is_empty() {
-                lines.push_back(l);
-                line = LinkedList::new();
-            } else {
-                let l = Expr::List(currentlist);
-            }
-
-            let l = Expr::List(currentlist);
-            line.push_back(l);
-            currentlist = LinkedList::new();
-        } else {
-            let e = parse_expr(t);
-            currentlist.push_back(e);
-        }
-    }**/
+	}
+	return Ok(Expr::Lines(code));
 }
 
 #[cfg(test)]
@@ -303,6 +298,8 @@ mod tests {
         assert_eq!(tokenize(String::from("\"((((")).unwrap(), vec!["\"(((("]);
         assert_eq!(
             tokenize(String::from("(())")).unwrap(),
+
+
             vec!["(", "(", ")", ")"]
         );
     }
@@ -340,4 +337,47 @@ mod tests {
             Expr::Str(String::from("aaa"))
         );
     }
+
+	#[test]
+	fn test_parse_01() {
+		let tokens = tokenize(String::from("(1 2 3)"));
+		let tokens = match tokens {
+			Ok(a) => a,
+			Err(e) => panic!(e),
+		};
+		let result = parse(tokens);
+		let result = match result {
+			Ok(a) => a,
+			Err(e) => panic!(e),
+		};
+		let mut list: LinkedList<Expr> = LinkedList::new();
+		list.push_back(Expr::Num(1.0));
+		list.push_back(Expr::Num(2.0));
+		list.push_back(Expr::Num(3.0));
+		let expected = Expr::Lines(vec![Expr::List(list)]);
+		assert_eq!(result, expected);
+	}
+
+	#[test]
+	fn test_parse_02() {
+		let tokens = tokenize(String::from("(1) (2 3)"));
+		let tokens = match tokens {
+			Ok(a) => a,
+			Err(e) => panic!(e),
+		};
+		let result = parse(tokens);
+		let result = match result {
+			Ok(a) => a,
+			Err(e) => panic!(e),
+		};
+		let mut list: LinkedList<Expr> = LinkedList::new();
+		list.push_back(Expr::Num(1.0));
+		let first = list;
+		list = LinkedList::new();
+		list.push_back(Expr::Num(2.0));
+		list.push_back(Expr::Num(3.0));
+		let expected = Expr::Lines(vec![Expr::List(first), Expr::List(list)]);
+		assert_eq!(result, expected);
+	}
+
 }
