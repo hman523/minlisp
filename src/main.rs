@@ -5,8 +5,10 @@ type Tokens = Vec<String>;
 
 fn main() {
     println!("minlisp interpreter");
+    repl();
 }
 
+#[derive(Debug, Clone)]
 struct Memory {
     vars: HashMap<String, Expr>,
 }
@@ -111,6 +113,7 @@ enum Error {
     ArityMismatch(String, usize, usize, Option<usize>),
     CloseParenMissing(Option<usize>),
     OpenParenMissing(Option<usize>),
+    CannotPrint(String),
 }
 
 impl std::fmt::Display for Error {
@@ -170,6 +173,7 @@ impl std::fmt::Display for Error {
                 ),
                 None => write!(f, "Parenthesis mismatch: too many close parenthesis"),
             },
+            Error::CannotPrint(typeofval) => write!(f, "Cannot print type {}", typeofval),
         }
     }
 }
@@ -177,6 +181,7 @@ impl std::fmt::Display for Error {
 /// This function just gets an input (String) and returns
 /// a tokenized result (a vector of strings, either a token or parenthesis)
 fn tokenize(code: String) -> Result<Tokens, Error> {
+    dbg!("In tokenize");
     let mut v = Vec::new();
     let mut cur = String::new();
     let mut in_quotes = false;
@@ -271,6 +276,7 @@ fn parse_expr(token: String) -> Expr {
 /// ```vec![Expr::List(vec![Expr::Func("print"), Expr::Str("hi")]),
 /// Expr::List(vec![Expr::Func("print"), Expr::Str("bye")])]```
 fn parse(tokens: Tokens) -> Result<Expr, Error> {
+    dbg!("In parse");
     let mut code: Vec<Expr> = Vec::new();
     let mut line: LinkedList<Expr> = LinkedList::new();
     for i in 0..tokens.len() {
@@ -288,7 +294,61 @@ fn parse(tokens: Tokens) -> Result<Expr, Error> {
             line.push_back(e);
         }
     }
+    dbg!("Leaving parse");
     return Ok(Expr::Lines(code));
+}
+
+fn read() -> String {
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+    return input;
+}
+
+fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memory)> {
+    return Ok((Expr::Bool(true), state));
+}
+
+fn print(x: Result<(Expr, Memory), (Error, Memory)>) -> Result<(), Error> {
+    match x {
+        Ok((e, m)) => match e {
+            Expr::Func(_) => Err(Error::CannotPrint(String::from("function"))),
+            Expr::Var(v) => match m.get(&v) {
+                Ok(val) => Ok(print!("{}", val)),
+                Err(e) => Err(e),
+            },
+            _ => Ok(print!("{}", e)),
+        },
+        Err((e, _)) => Ok(print!("{}", e)),
+    }
+}
+
+fn repl() {
+    let mut mem = Memory::new();
+    loop {
+        //read
+        let input = read();
+        //tokenize
+        let tokens = tokenize(input);
+        match tokens {
+            Ok(ts) => {
+                //parse
+                let parsed = parse(ts);
+                match parsed {
+                    Ok(expr) => {
+                        //eval
+                        let evaled = eval(expr, mem.clone());
+                        //print
+                        print(evaled.clone());
+                        if evaled.is_ok() {
+                            mem = evaled.unwrap().1
+                        }
+                    }
+                    Err(e) => println!("{}", e),
+                }
+            }
+            Err(e) => println!("{}", e),
+        }
+    }
 }
 
 #[cfg(test)]
