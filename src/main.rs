@@ -181,14 +181,13 @@ impl std::fmt::Display for Error {
 /// This function just gets an input (String) and returns
 /// a tokenized result (a vector of strings, either a token or parenthesis)
 fn tokenize(code: String) -> Result<Tokens, Error> {
-    dbg!("In tokenize");
     let mut v = Vec::new();
     let mut cur = String::new();
     let mut in_quotes = false;
     let mut last_escaped = false;
     let mut paren_count: i32 = 0;
     for i in code.chars() {
-        if i == ' ' && !in_quotes {
+        if i.is_whitespace() && !in_quotes {
             if !cur.is_empty() {
                 v.push(cur.clone());
                 cur = String::new();
@@ -384,6 +383,13 @@ mod tests {
             tokenize(String::from("(())")).unwrap(),
             vec!["(", "(", ")", ")"]
         );
+        assert_eq!(tokenize(String::from("(\n\n)")).unwrap(), vec!["(", ")"]);
+        assert_eq!(
+            tokenize(String::from("(\n(\n))")).unwrap(),
+            vec!["(", "(", ")", ")"]
+        );
+        assert_eq!(tokenize(String::from("(\t\t)")).unwrap(), vec!["(", ")"]);
+        assert_eq!(tokenize(String::from("(\r\r)")).unwrap(), vec!["(", ")"]);
     }
 
     #[test]
