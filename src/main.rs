@@ -15,9 +15,9 @@ struct Memory {
 
 impl Memory {
     pub fn new() -> Memory {
-        Memory {
-            vars: HashMap::new(),
-        }
+        let mut values = HashMap::new();
+        values.insert(String::from("PI"), Expr::Num(std::f64::consts::PI));
+        Memory { vars: values }
     }
 
     pub fn get(&self, s: &String) -> Result<Expr, Error> {
@@ -45,7 +45,7 @@ enum Expr {
     Str(String),
     Bool(bool),
     Num(f64),
-    Func(fn(&[Expr]) -> Result<Expr, Error>),
+    Func(fn(&LinkedList<Expr>) -> Result<Expr, Error>),
     List(LinkedList<Expr>),
     Lines(Vec<Expr>),
 }
@@ -114,6 +114,7 @@ enum Error {
     CloseParenMissing(Option<usize>),
     OpenParenMissing(Option<usize>),
     CannotPrint(String),
+    NoFuncGiven(),
 }
 
 impl std::fmt::Display for Error {
@@ -174,6 +175,7 @@ impl std::fmt::Display for Error {
                 None => write!(f, "Parenthesis mismatch: too many close parenthesis"),
             },
             Error::CannotPrint(typeofval) => write!(f, "Cannot print type {}", typeofval),
+            Error::NoFuncGiven() => write!(f, "Cannot call eval on empty string"),
         }
     }
 }
@@ -208,6 +210,9 @@ fn tokenize(code: String) -> Result<Tokens, Error> {
             }
             v.push(String::from(")"));
             paren_count -= 1;
+            if paren_count < 0 {
+                return Err(Error::OpenParenMissing(None));
+            }
         } else if i == '"' && !last_escaped {
             if in_quotes {
                 cur.push('"');
@@ -304,7 +309,39 @@ fn read() -> String {
 }
 
 fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memory)> {
-    return Ok((Expr::Bool(true), state));
+    let mut current_state = state.clone();
+    match expression {
+        Expr::Lines(lines) => {
+            for (count, i) in lines.iter().enumerate() {
+                let result = eval(i.clone(), current_state);
+                if result.is_ok() {
+                    let (_, m) = result.clone().unwrap();
+                    current_state = m;
+                } else {
+                    return result;
+                }
+                if count == lines.len() - 1 {
+                    return result;
+                }
+            }
+        }
+        Expr::List(mut list) => {
+            let func = list.pop_front();
+            if func.is_none() {
+                return Err((Error::NoFuncGiven(), current_state));
+            }
+            let func = func.unwrap();
+            let params = Expr::List(list);
+            return apply(current_state, func, params);
+        }
+        _ => unimplemented!(),
+    }
+    return Ok((Expr::Bool(true), current_state));
+}
+
+fn apply(state: Memory, f: Expr, params: Expr) -> Result<(Expr, Memory), (Error, Memory)> {
+    let mut new_state = state.clone();
+    return Ok((Expr::Bool(false), new_state));
 }
 
 fn print(x: Result<(Expr, Memory), (Error, Memory)>) -> Result<(), Error> {
