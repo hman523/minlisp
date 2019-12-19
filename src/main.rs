@@ -18,9 +18,9 @@ impl Memory {
     /// This function returns a memory object with the built in values and
     /// functions
     pub fn new() -> Memory {
-        let mut values = HashMap::new();
-        values.insert(String::from("PI"), Expr::Num(std::f64::consts::PI));
-        Memory { vars: values }
+        Memory {
+            vars: Memory::default_env(),
+        }
     }
 
     /// get function
@@ -30,6 +30,12 @@ impl Memory {
             Ok(e) => Ok((*e).clone()),
             Err(e) => Err(e),
         }
+    }
+
+    pub fn default_env() -> HashMap<String, Expr> {
+        let mut values = HashMap::new();
+        values.insert(String::from("PI"), Expr::Num(std::f64::consts::PI));
+        values
     }
 
     /// insert function
@@ -124,6 +130,7 @@ enum Error {
     OpenParenMissing(Option<usize>),
     CannotPrint(String),
     NoFuncGiven(),
+    EvalCalledOnNothing(),
 }
 
 impl std::fmt::Display for Error {
@@ -185,6 +192,7 @@ impl std::fmt::Display for Error {
             },
             Error::CannotPrint(typeofval) => write!(f, "Cannot print type {}", typeofval),
             Error::NoFuncGiven() => write!(f, "Cannot call eval on empty string"),
+            Error::EvalCalledOnNothing() => write!(f, "Cannot call eval on nothing"),
         }
     }
 }
@@ -348,8 +356,9 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
     let mut current_state = state.clone();
     match expression {
         Expr::Lines(lines) => {
+            let mut result = Err((Error::EvalCalledOnNothing(), current_state.clone()));
             for (count, i) in lines.iter().enumerate() {
-                let result = eval(i.clone(), current_state);
+                result = eval(i.clone(), current_state);
                 if result.is_ok() {
                     let (_, m) = result.clone().unwrap();
                     current_state = m;
@@ -360,6 +369,7 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
                     return result;
                 }
             }
+            return result;
         }
         Expr::List(mut list) => {
             let func = list.pop_front();
@@ -370,9 +380,23 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
             let params = Expr::List(list);
             return apply(current_state, func, params);
         }
-        _ => unimplemented!(),
+        Expr::Num(n) => {
+            return Ok((Expr::Num(n), current_state));
+        }
+        Expr::Bool(b) => {
+            return Ok((Expr::Bool(b), current_state));
+        }
+        Expr::Str(s) => {
+            return Ok((Expr::Str(s), current_state));
+        }
+        Expr::Func(f) => {
+            return Ok((Expr::Func(f), current_state));
+        }
+        Expr::Var(v) => match current_state.get(&v) {
+            Ok(val) => Ok((val, current_state)),
+            Err(e) => Err((e, current_state)),
+        },
     }
-    return Ok((Expr::Bool(true), current_state));
 }
 
 fn apply(state: Memory, f: Expr, params: Expr) -> Result<(Expr, Memory), (Error, Memory)> {
@@ -385,12 +409,12 @@ fn print(x: Result<(Expr, Memory), (Error, Memory)>) -> Result<(), Error> {
         Ok((e, m)) => match e {
             Expr::Func(_) => Err(Error::CannotPrint(String::from("function"))),
             Expr::Var(v) => match m.get(&v) {
-                Ok(val) => Ok(print!("{}", val)),
+                Ok(val) => Ok(println!("{}", val)),
                 Err(e) => Err(e),
             },
-            _ => Ok(print!("{}", e)),
+            _ => Ok(println!("{}", e)),
         },
-        Err((e, _)) => Ok(print!("{}", e)),
+        Err((e, _)) => Ok(println!("{}", e)),
     }
 }
 
