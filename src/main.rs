@@ -14,12 +14,17 @@ struct Memory {
 }
 
 impl Memory {
+    /// new function
+    /// This function returns a memory object with the built in values and
+    /// functions
     pub fn new() -> Memory {
         let mut values = HashMap::new();
         values.insert(String::from("PI"), Expr::Num(std::f64::consts::PI));
         Memory { vars: values }
     }
 
+    /// get function
+    /// returns either the value or a not a variable error
     pub fn get(&self, s: &String) -> Result<Expr, Error> {
         match self.vars.get(s).ok_or(Error::NotAVariable(s.to_string())) {
             Ok(e) => Ok((*e).clone()),
@@ -27,6 +32,9 @@ impl Memory {
         }
     }
 
+    /// insert function
+    /// returns either an empty tuple on success or an error if redefing
+    /// a variable
     pub fn insert(&mut self, s: &String, e: Expr) -> Result<(), Error> {
         let exists = self.vars.insert(s.clone(), e);
         match exists {
@@ -273,33 +281,53 @@ fn parse_expr(token: String) -> Expr {
     }
 }
 
+/// SOV enum (String or vec)
+enum SOV {
+    S(String),
+    V(Vec<String>),
+}
+
+/// read_seq function
+/// This is heavily inspirired by Stepan Parunashvili's
+/// implementation of the rust lisp interpreter
+fn read_seq(tokens: Tokens) -> Result<(Expr, Tokens), Error> {
+    let mut result: LinkedList<Expr> = LinkedList::new();
+    let mut ts = tokens.clone();
+    loop {
+        let (next, rest) = ts.split_first().ok_or(Error::OpenParenMissing(None))?;
+        if next == ")" {
+            return Ok((Expr::List(result), rest.to_vec()));
+        }
+        let (expr, new_ts) = parseh(ts)?;
+        result.push_back(expr);
+        ts = new_ts;
+    }
+}
+
+fn parseh(tokens: Tokens) -> Result<(Expr, Tokens), Error> {
+    dbg!("In parse");
+    let (token, tail) = tokens.split_first().unwrap();
+    match token.as_ref() {
+        "(" => read_seq(tail.to_vec()),
+        ")" => Err(Error::OpenParenMissing(None)),
+        _ => Ok((parse_expr(token.to_string()), tail.to_vec())),
+    }
+}
+
 /// parse function
 /// This function converts tokens into a valid vector of expressions
 /// Each element in the vector is another line in the code
-/// The code would be parsed from `(print "hi") (print "bye")` to
-/// ```vec![Expr::List(vec![Expr::Func("print"), Expr::Str("hi")]),
-/// Expr::List(vec![Expr::Func("print"), Expr::Str("bye")])]```
+/// The code would be parsed from `(print "hi") (print "bye")` to a
+/// Expr::Lines
+/// ```vec![Expr::List(vec![Expr::Var("print"), Expr::Str("hi")]),
+/// Expr::List(Vec![Expr::var("print"), Expr::Str("bye")])]```
 fn parse(tokens: Tokens) -> Result<Expr, Error> {
     dbg!("In parse");
-    let mut code: Vec<Expr> = Vec::new();
-    let mut line: LinkedList<Expr> = LinkedList::new();
-    for i in 0..tokens.len() {
-        if tokens[i] == "(" {
-            let inner = parse(tokens[1..].to_vec());
-            if inner.is_ok() {
-                code.push(inner.unwrap());
-            } else {
-                return inner;
-            }
-        } else if tokens[i] == ")" {
-            return Ok(Expr::List(line));
-        } else {
-            let e = parse_expr(tokens[i].clone());
-            line.push_back(e);
-        }
+    let a = parseh(tokens);
+    match a {
+        Ok((x, _)) => Ok(x),
+        Err(e) => Err(e),
     }
-    dbg!("Leaving parse");
-    return Ok(Expr::Lines(code));
 }
 
 fn read() -> String {
