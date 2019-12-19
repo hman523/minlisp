@@ -55,7 +55,7 @@ enum Expr {
     Num(f64),
     Func(fn(&LinkedList<Expr>) -> Result<Expr, Error>),
     List(LinkedList<Expr>),
-    Lines(Vec<Expr>),
+    Lines(LinkedList<Expr>),
 }
 
 impl std::cmp::PartialEq for Expr {
@@ -67,6 +67,7 @@ impl std::cmp::PartialEq for Expr {
             (Expr::Num(a), Expr::Num(b)) => a == b,
             (Expr::Func(_), Expr::Func(_)) => unimplemented!(),
             (Expr::List(a), Expr::List(b)) => a == b,
+            (Expr::Lines(a), Expr::Lines(b)) => a == b,
             _ => false,
         }
     }
@@ -281,12 +282,6 @@ fn parse_expr(token: String) -> Expr {
     }
 }
 
-/// SOV enum (String or vec)
-enum SOV {
-    S(String),
-    V(Vec<String>),
-}
-
 /// read_seq function
 /// This is heavily inspirired by Stepan Parunashvili's
 /// implementation of the rust lisp interpreter
@@ -305,7 +300,6 @@ fn read_seq(tokens: Tokens) -> Result<(Expr, Tokens), Error> {
 }
 
 fn parseh(tokens: Tokens) -> Result<(Expr, Tokens), Error> {
-    dbg!("In parse");
     let (token, tail) = tokens.split_first().unwrap();
     match token.as_ref() {
         "(" => read_seq(tail.to_vec()),
@@ -322,12 +316,26 @@ fn parseh(tokens: Tokens) -> Result<(Expr, Tokens), Error> {
 /// ```vec![Expr::List(vec![Expr::Var("print"), Expr::Str("hi")]),
 /// Expr::List(Vec![Expr::var("print"), Expr::Str("bye")])]```
 fn parse(tokens: Tokens) -> Result<Expr, Error> {
-    dbg!("In parse");
-    let a = parseh(tokens);
-    match a {
-        Ok((x, _)) => Ok(x),
-        Err(e) => Err(e),
+    let mut code: LinkedList<Expr> = LinkedList::new();
+    let mut curr_tokens = tokens;
+    loop {
+        let mut current_line: Result<(Expr, Vec<String>), Error> = parseh(curr_tokens);
+        let mut empty = false;
+        if let Ok((x, y)) = current_line {
+            code.push_back(x);
+            if y.is_empty() {
+                empty = true;
+            }
+            curr_tokens = y;
+        } else {
+            return Err(current_line.unwrap_err());
+        }
+
+        if empty {
+            break;
+        }
     }
+    Ok(Expr::Lines(code))
 }
 
 fn read() -> String {
@@ -507,7 +515,9 @@ mod tests {
         list.push_back(Expr::Num(1.0));
         list.push_back(Expr::Num(2.0));
         list.push_back(Expr::Num(3.0));
-        let expected = Expr::Lines(vec![Expr::List(list)]);
+        let mut lines = LinkedList::new();
+        lines.push_back(Expr::List(list));
+        let expected = Expr::Lines(lines);
         assert_eq!(result, expected);
     }
 
@@ -529,7 +539,10 @@ mod tests {
         list = LinkedList::new();
         list.push_back(Expr::Num(2.0));
         list.push_back(Expr::Num(3.0));
-        let expected = Expr::Lines(vec![Expr::List(first), Expr::List(list)]);
+        let mut lines: LinkedList<Expr> = LinkedList::new();
+        lines.push_back(Expr::List(first));
+        lines.push_back(Expr::List(list));
+        let expected = Expr::Lines(lines);
         assert_eq!(result, expected);
     }
 
@@ -552,7 +565,9 @@ mod tests {
         list.push_back(inner);
         list.push_back(Expr::Num(2.0));
         list.push_back(Expr::Num(3.0));
-        let expected = Expr::Lines(vec![Expr::List(list)]);
+        let mut lines: LinkedList<Expr> = LinkedList::new();
+        lines.push_back(Expr::List(list));
+        let expected = Expr::Lines(lines);
         assert_eq!(result, expected);
     }
 
