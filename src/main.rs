@@ -6,7 +6,6 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::collections::HashMap;
 use std::collections::LinkedList;
-use std::io::Write;
 
 type Tokens = Vec<String>;
 
@@ -18,6 +17,7 @@ fn main() {
 #[derive(Debug, Clone)]
 struct Memory {
     vars: HashMap<String, Expr>,
+    call_stack: LinkedList<HashMap<String, Expr>>,
 }
 
 impl Memory {
@@ -27,16 +27,25 @@ impl Memory {
     pub fn new() -> Memory {
         Memory {
             vars: Memory::default_env(),
+            call_stack: LinkedList::new(),
         }
     }
 
     /// get function
     /// returns either the value or a not a variable error
     pub fn get(&self, s: &String) -> Option<Expr> {
-        match self.vars.get(s) {
+        for i in self.call_stack.clone() {
+            if i.contains_key(s) {
+                return match i.get(s) {
+                    Some(v) => Some(v.clone()),
+                    None => None,
+                };
+            }
+        }
+        return match self.vars.get(s) {
             Some(v) => Some(v.clone()),
             None => None,
-        }
+        };
     }
 
     pub fn default_env() -> HashMap<String, Expr> {
