@@ -44,27 +44,17 @@ impl Memory {
             Expr::Func(|lst| -> Result<Expr, Error> {
                 let mut list = lst.clone();
                 if list.len() != 2 {
-                    return Err(Error::ArityMismatch("+".to_string(), list.len(), 2, None));
+                    return Err(Error::ArityMismatch("+".to_string(), list.len(), 2));
                 }
                 if let Some(Expr::Num(a)) = list.pop_front() {
                     if let Some(Expr::Num(b)) = list.pop_front() {
                         return Ok(Expr::Num(a + b));
                     }
                     let b = list.pop_front().unwrap();
-                    return Err(Error::TypeError(
-                        "+".to_string(),
-                        b,
-                        "Num".to_string(),
-                        None,
-                    ));
+                    return Err(Error::TypeError("+".to_string(), b, "Num".to_string()));
                 }
                 let a = list.pop_front().unwrap();
-                return Err(Error::TypeError(
-                    "+".to_string(),
-                    a,
-                    "Num".to_string(),
-                    None,
-                ));
+                return Err(Error::TypeError("+".to_string(), a, "Num".to_string()));
             }),
         );
         values
@@ -149,20 +139,19 @@ fn get_type_name(e: Expr) -> String {
 
 /// Error Enum
 /// This enum is used for reporting errors
-/// Some contain a string for the variable part of the error and
-/// an option<usize> to indicate the line number if there is one
+/// Some contain a string for the variable part of the error
 #[derive(Clone, Debug, PartialEq)]
 enum Error {
     //fn name, given variable, expected type
-    TypeError(String, Expr, String, Option<usize>),
+    TypeError(String, Expr, String),
     //fn name
-    NotAProcedure(String, Option<usize>),
+    NotAProcedure(String),
     NotAVariable(String),
     RedefiningVar(String),
     //fn name, given number of params, expected number
-    ArityMismatch(String, usize, usize, Option<usize>),
-    CloseParenMissing(Option<usize>),
-    OpenParenMissing(Option<usize>),
+    ArityMismatch(String, usize, usize),
+    CloseParenMissing(),
+    OpenParenMissing(),
     CannotPrint(String),
     NoFuncGiven(),
     EvalCalledOnNothing(),
@@ -171,60 +160,32 @@ enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.clone() {
-            Error::TypeError(func, given, expected, line) => {
-                let on_line = match line {
-                    Some(x) => format!(" on line {}", x),
-                    None => String::new(),
-                };
-                write!(
-                    f,
-                    "Type error in function {}{}
-					\tExpected type:{}
-					\tGiven type:{}",
-                    func,
-                    on_line,
-                    expected,
-                    get_type_name(given)
-                )
-            }
-            Error::NotAProcedure(func, line) => {
-                let on_line = match line {
-                    Some(x) => format!(" on line {}", x),
-                    None => String::new(),
-                };
-                write!(f, "Unable to call {}, function not found{}", func, on_line)
-            }
+            Error::TypeError(func, given, expected) => write!(
+                f,
+                "Type error in function {}\n\
+                 \tExpected type:{}\n\
+                 \tGiven type:{}",
+                func,
+                expected,
+                get_type_name(given)
+            ),
+            Error::NotAProcedure(func) => write!(f, "Unable to call {}, function not found", func),
             Error::NotAVariable(name) => write!(f, "Variable {} does not exist", name),
             Error::RedefiningVar(name) => write!(f, "Cannot redeclare variable {}", name),
-            Error::ArityMismatch(func, given, expected, line) => {
-                let on_line = match line {
-                    Some(x) => format!(" on line {}", x),
-                    None => String::new(),
-                };
-                write!(
-                    f,
-                    "Arity mismatch error in {}{}
-				\tGiven parameters: {}
-				\tExpected parameters: {}",
-                    func, on_line, given, expected
-                )
+            Error::ArityMismatch(func, given, expected) => write!(
+                f,
+                "Arity mismatch error in {}\n\
+                 \tGiven parameters: {}\n\
+                 \tExpected parameters: {}",
+                func, given, expected
+            ),
+            Error::CloseParenMissing() => {
+                write!(f, "Parenthesis mismatch: too many open parenthesis")
             }
-            Error::CloseParenMissing(line) => match line {
-                Some(x) => write!(
-                    f,
-                    "Parenthesis mismatch on line {}: too many open parenthesis",
-                    x
-                ),
-                None => write!(f, "Parenthesis mismatch: too many open parenthesis"),
-            },
-            Error::OpenParenMissing(line) => match line {
-                Some(x) => write!(
-                    f,
-                    "Parenthesis mismatch on line {}: too many close parenthesis",
-                    x
-                ),
-                None => write!(f, "Parenthesis mismatch: too many close parenthesis"),
-            },
+            Error::OpenParenMissing() => {
+                write!(f, "Parenthesis mismatch: too many close parenthesis")
+            }
+
             Error::CannotPrint(typeofval) => write!(f, "Cannot print type {}", typeofval),
             Error::NoFuncGiven() => write!(f, "Cannot call eval on empty string"),
             Error::EvalCalledOnNothing() => write!(f, "Cannot call eval on nothing"),
@@ -263,7 +224,7 @@ fn tokenize(code: String) -> Result<Tokens, Error> {
             v.push(String::from(")"));
             paren_count -= 1;
             if paren_count < 0 {
-                return Err(Error::OpenParenMissing(None));
+                return Err(Error::OpenParenMissing());
             }
         } else if i == '"' && !last_escaped {
             if in_quotes {
@@ -293,8 +254,8 @@ fn tokenize(code: String) -> Result<Tokens, Error> {
         v.push(cur);
     }
     match paren_count {
-        x if x > 0 => Err(Error::CloseParenMissing(None)),
-        x if x < 0 => Err(Error::OpenParenMissing(None)),
+        x if x > 0 => Err(Error::CloseParenMissing()),
+        x if x < 0 => Err(Error::OpenParenMissing()),
         _ => Ok(v),
     }
 }
@@ -332,7 +293,7 @@ fn read_seq(tokens: Tokens) -> Result<(Expr, Tokens), Error> {
     let mut result: LinkedList<Expr> = LinkedList::new();
     let mut ts = tokens.clone();
     loop {
-        let (next, rest) = ts.split_first().ok_or(Error::OpenParenMissing(None))?;
+        let (next, rest) = ts.split_first().ok_or(Error::OpenParenMissing())?;
         if next == ")" {
             return Ok((Expr::List(result), rest.to_vec()));
         }
@@ -346,7 +307,7 @@ fn parseh(tokens: Tokens) -> Result<(Expr, Tokens), Error> {
     let (token, tail) = tokens.split_first().unwrap();
     match token.as_ref() {
         "(" => read_seq(tail.to_vec()),
-        ")" => Err(Error::OpenParenMissing(None)),
+        ")" => Err(Error::OpenParenMissing()),
         _ => Ok((parse_expr(token.to_string()), tail.to_vec())),
     }
 }
@@ -453,12 +414,12 @@ fn apply(
         Expr::Var(var) => {
             let func = state.get(&var);
             if func == None {
-                return Err((Error::NotAProcedure(var, None), state));
+                return Err((Error::NotAProcedure(var), state));
             }
             let func = func.unwrap();
             let res = match func {
                 Expr::Func(function) => function(&params),
-                _ => Err(Error::NotAProcedure(func.to_string(), None)),
+                _ => Err(Error::NotAProcedure(func.to_string())),
             };
             let result = match res {
                 Ok(e) => Ok((e, new_state)),
@@ -466,7 +427,7 @@ fn apply(
             };
             return result;
         }
-        _ => Err((Error::NotAProcedure(f.to_string(), None), state)),
+        _ => Err((Error::NotAProcedure(f.to_string()), state)),
     }
 }
 
