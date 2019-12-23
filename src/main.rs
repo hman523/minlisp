@@ -1,9 +1,13 @@
 extern crate colored;
+extern crate rustyline;
 
 use colored::*;
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 use std::collections::HashMap;
 use std::collections::LinkedList;
 use std::io::Write;
+
 
 type Tokens = Vec<String>;
 
@@ -342,14 +346,6 @@ fn parse(tokens: Tokens) -> Result<Expr, Error> {
     Ok(Expr::Lines(code))
 }
 
-fn read() -> String {
-    let mut input = String::new();
-    print!("> ");
-    std::io::stdout().flush().unwrap();
-    std::io::stdin().read_line(&mut input).unwrap();
-    return input;
-}
-
 fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memory)> {
     let mut current_state = state.clone();
     match expression {
@@ -490,9 +486,29 @@ fn print(x: Result<(Expr, Memory), (Error, Memory)>) {
 
 fn repl() {
     let mut mem = Memory::new();
-    loop {
+    let mut rl = Editor::<()>::new();
+	if rl.load_history(".history.txt").is_err() {
+		println!("{}", "No existing history, stating a new one in .history.txt".yellow());
+	}
+	loop {
         //read
-        let input = read();
+        let readline = rl.readline("> ");
+		let mut input = String::new();
+		match readline {
+			Ok(r) => {
+				input = r;
+			},
+			Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
+				println!("{}", "Goodbye!".green().bold());
+				break;
+			},
+			Err(err) => {
+				println!("Error: {:?}", err);
+				break;
+			}
+		};
+		rl.add_history_entry(input.as_str());
+		rl.save_history(".history.txt").unwrap();
         //tokenize
         let tokens = tokenize(input);
         match tokens {
