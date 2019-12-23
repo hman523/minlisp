@@ -323,7 +323,7 @@ fn parse(tokens: Tokens) -> Result<Expr, Error> {
     let mut code: LinkedList<Expr> = LinkedList::new();
     let mut curr_tokens = tokens;
     loop {
-        let mut current_line: Result<(Expr, Vec<String>), Error> = parseh(curr_tokens);
+        let current_line: Result<(Expr, Vec<String>), Error> = parseh(curr_tokens);
         let mut empty = false;
         if let Ok((x, y)) = current_line {
             code.push_back(x);
@@ -396,12 +396,43 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
     }
 }
 
+fn eval_list(list: LinkedList<Expr>, state: Memory) -> Result<(Expr, Memory), (Error, Memory)> {
+    let mut returned_list: LinkedList<Expr> = LinkedList::new();
+    let mut current_state = state.clone();
+    for i in list {
+        if let Expr::List(_) = i {
+            let evaled = eval(i, current_state);
+            match evaled {
+                Ok((e, s)) => {
+                    current_state = s;
+                    returned_list.push_back(e);
+                }
+                Err((e, s)) => {
+                    return Err((e, s));
+                }
+            };
+        } else {
+            returned_list.push_back(i);
+        }
+    }
+    Ok((Expr::List(returned_list), current_state))
+}
+
 fn apply(
     state: Memory,
     f: Expr,
     params: LinkedList<Expr>,
 ) -> Result<(Expr, Memory), (Error, Memory)> {
     let mut new_state = state.clone();
+    let params = eval_list(params, state.clone());
+    if params.is_err() {
+        return params;
+    }
+    let (params, new_state) = params.unwrap();
+    let params: LinkedList<Expr> = match params {
+        Expr::List(l) => l,
+        _ => LinkedList::new(),
+    };
     match f {
         Expr::Func(func) => {
             let res = func(&params);
@@ -412,7 +443,7 @@ fn apply(
             return result;
         }
         Expr::Var(var) => {
-            let func = state.get(&var);
+            let func = new_state.get(&var);
             if func == None {
                 return Err((Error::NotAProcedure(var), state));
             }
@@ -427,7 +458,7 @@ fn apply(
             };
             return result;
         }
-        _ => Err((Error::NotAProcedure(f.to_string()), state)),
+        _ => Err((Error::NotAProcedure(f.to_string()), new_state)),
     }
 }
 
