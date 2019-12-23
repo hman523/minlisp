@@ -35,6 +35,31 @@ impl Memory {
     pub fn default_env() -> HashMap<String, Expr> {
         let mut values = HashMap::new();
         values.insert(String::from("PI"), Expr::Num(std::f64::consts::PI));
+        values.insert(
+            String::from("+"),
+            Expr::Func(|lst| -> Result<Expr, Error> {
+                let mut list = lst.clone();
+                if let Some(Expr::Num(a)) = list.pop_front() {
+                    if let Some(Expr::Num(b)) = list.pop_front() {
+                        return Ok(Expr::Num(a + b));
+                    }
+                    let b = list.pop_front().unwrap();
+                    return Err(Error::TypeError(
+                        "+".to_string(),
+                        b,
+                        "Num".to_string(),
+                        None,
+                    ));
+                }
+                let a = list.pop_front().unwrap();
+                return Err(Error::TypeError(
+                    "+".to_string(),
+                    a,
+                    "Num".to_string(),
+                    None,
+                ));
+            }),
+        );
         values
     }
 
@@ -377,8 +402,7 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
                 return Err((Error::NoFuncGiven(), current_state));
             }
             let func = func.unwrap();
-            let params = Expr::List(list);
-            return apply(current_state, func, params);
+            return apply(current_state, func, list);
         }
         Expr::Num(n) => {
             return Ok((Expr::Num(n), current_state));
@@ -399,9 +423,23 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
     }
 }
 
-fn apply(state: Memory, f: Expr, params: Expr) -> Result<(Expr, Memory), (Error, Memory)> {
+fn apply(
+    state: Memory,
+    f: Expr,
+    params: LinkedList<Expr>,
+) -> Result<(Expr, Memory), (Error, Memory)> {
     let mut new_state = state.clone();
-    return Ok((Expr::Bool(false), new_state));
+    match f {
+        Expr::Func(func) => {
+            let res = func(&params);
+            let result = match res {
+                Ok(e) => Ok((e, new_state)),
+                Err(e) => Err((e, new_state)),
+            };
+            return result;
+        }
+        _ => Err((Error::NotAProcedure(f.to_string(), None), state)),
+    }
 }
 
 fn print(x: Result<(Expr, Memory), (Error, Memory)>) -> Result<(), Error> {
@@ -434,9 +472,12 @@ fn repl() {
                         //eval
                         let evaled = eval(expr, mem.clone());
                         //print
-                        print(evaled.clone());
                         if evaled.is_ok() {
-                            mem = evaled.unwrap().1
+                            let e = print(evaled.clone());
+                            mem = evaled.unwrap().1;
+                            if e.is_err() {
+                                eprint!("{}", e.unwrap_err());
+                            }
                         }
                     }
                     Err(e) => println!("{}", e),
