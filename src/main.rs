@@ -1,3 +1,6 @@
+extern crate colored;
+
+use colored::*;
 use std::collections::HashMap;
 use std::collections::LinkedList;
 use std::io::Write;
@@ -26,10 +29,10 @@ impl Memory {
 
     /// get function
     /// returns either the value or a not a variable error
-    pub fn get(&self, s: &String) -> Result<Expr, Error> {
-        match self.vars.get(s).ok_or(Error::NotAVariable(s.to_string())) {
-            Ok(e) => Ok((*e).clone()),
-            Err(e) => Err(e),
+    pub fn get(&self, s: &String) -> Option<Expr> {
+        match self.vars.get(s) {
+            Some(v) => Some(v.clone()),
+            None => None,
         }
     }
 
@@ -40,6 +43,9 @@ impl Memory {
             String::from("+"),
             Expr::Func(|lst| -> Result<Expr, Error> {
                 let mut list = lst.clone();
+                if list.len() != 2 {
+                    return Err(Error::ArityMismatch("+".to_string(), list.len(), 2, None));
+                }
                 if let Some(Expr::Num(a)) = list.pop_front() {
                     if let Some(Expr::Num(b)) = list.pop_front() {
                         return Ok(Expr::Num(a + b));
@@ -423,8 +429,8 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
             return Ok((Expr::Func(f), current_state));
         }
         Expr::Var(v) => match current_state.get(&v) {
-            Ok(val) => Ok((val, current_state)),
-            Err(e) => Err((e, current_state)),
+            Some(val) => Ok((val, current_state)),
+            None => Err((Error::NotAVariable(v), current_state)),
         },
     }
 }
@@ -446,7 +452,7 @@ fn apply(
         }
         Expr::Var(var) => {
             let func = state.get(&var);
-            if func.is_err() {
+            if func == None {
                 return Err((Error::NotAProcedure(var, None), state));
             }
             let func = func.unwrap();
@@ -467,14 +473,20 @@ fn apply(
 fn print(x: Result<(Expr, Memory), (Error, Memory)>) {
     match x {
         Ok((e, m)) => match e {
-            Expr::Func(_) => println!("{}", Error::CannotPrint(String::from("function"))),
+            Expr::Func(_) => println!(
+                "{}",
+                Error::CannotPrint(String::from("function"))
+                    .to_string()
+                    .red()
+                    .bold()
+            ),
             Expr::Var(v) => match m.get(&v) {
-                Ok(val) => println!("{}", val),
-                Err(e) => println!("{}", e),
+                Some(val) => println!("{}", val),
+                None => eprintln!("{}", Error::NotAVariable(v).to_string().red().bold()),
             },
             _ => println!("{}", e),
         },
-        Err((e, _)) => println!("{}", e),
+        Err((e, _)) => println!("{}", e.to_string().red().bold()),
     }
 }
 
@@ -495,14 +507,14 @@ fn repl() {
                         let evaled = eval(expr, mem.clone());
                         //print
                         if evaled.is_ok() {
-                            print(evaled.clone());
-                            mem = evaled.unwrap().1;
+                            mem = evaled.clone().unwrap().1;
                         }
+                        print(evaled);
                     }
-                    Err(e) => println!("{}", e),
+                    Err(e) => println!("{}", e.to_string().red().bold()),
                 }
             }
-            Err(e) => println!("{}", e),
+            Err(e) => println!("{}", e.to_string().red().bold()),
         }
     }
 }
