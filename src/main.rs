@@ -118,7 +118,7 @@ impl std::fmt::Display for Expr {
 impl std::fmt::Debug for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            Expr::Func(fun) => write!(f, "function"),
+            Expr::Func(_) => write!(f, "function"),
             _ => write!(f, "{}", self),
         }
     }
@@ -411,6 +411,12 @@ fn eval_list(list: LinkedList<Expr>, state: Memory) -> Result<(Expr, Memory), (E
                     return Err((e, s));
                 }
             };
+        } else if let Expr::Var(v) = i {
+            let var = current_state.get(&v);
+            match var {
+                Some(e) => returned_list.push_back(e),
+                None => return Err((Error::NotAVariable(v), current_state)),
+            };
         } else {
             returned_list.push_back(i);
         }
@@ -555,8 +561,8 @@ mod tests {
 
     #[test]
     fn test_tokenize_error() {
-        let open_error = Error::OpenParenMissing(None);
-        let close_error = Error::CloseParenMissing(None);
+        let open_error = Error::OpenParenMissing();
+        let close_error = Error::CloseParenMissing();
         assert_eq!(tokenize(String::from("(1 2 3")).unwrap_err(), close_error);
         assert_eq!(tokenize(String::from("1 2 3)")).unwrap_err(), open_error);
         assert_eq!(tokenize(String::from(")")).unwrap_err(), open_error);
@@ -695,5 +701,9 @@ mod tests {
     #[test]
     fn eval_valid_add() {
         assert_eq!(Expr::Num(3.0), eval_or_none("(+ 1 2)".to_string()).unwrap());
+        assert_eq!(
+            Expr::Num(3.0),
+            eval_or_none("(+ 1 (+ 1 1))".to_string()).unwrap()
+        );
     }
 }
