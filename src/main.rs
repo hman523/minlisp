@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::LinkedList;
+use std::io::Write;
 
 type Tokens = Vec<String>;
 
@@ -120,7 +121,10 @@ impl std::fmt::Display for Expr {
 
 impl std::fmt::Debug for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        match &self {
+            Expr::Func(fun) => write!(f, "function"),
+            _ => write!(f, "{}", self),
+        }
     }
 }
 
@@ -373,6 +377,8 @@ fn parse(tokens: Tokens) -> Result<Expr, Error> {
 
 fn read() -> String {
     let mut input = String::new();
+    print!("> ");
+    std::io::stdout().flush().unwrap();
     std::io::stdin().read_line(&mut input).unwrap();
     return input;
 }
@@ -438,21 +444,37 @@ fn apply(
             };
             return result;
         }
+        Expr::Var(var) => {
+            let func = state.get(&var);
+            if func.is_err() {
+                return Err((Error::NotAProcedure(var, None), state));
+            }
+            let func = func.unwrap();
+            let res = match func {
+                Expr::Func(function) => function(&params),
+                _ => Err(Error::NotAProcedure(func.to_string(), None)),
+            };
+            let result = match res {
+                Ok(e) => Ok((e, new_state)),
+                Err(e) => Err((e, new_state)),
+            };
+            return result;
+        }
         _ => Err((Error::NotAProcedure(f.to_string(), None), state)),
     }
 }
 
-fn print(x: Result<(Expr, Memory), (Error, Memory)>) -> Result<(), Error> {
+fn print(x: Result<(Expr, Memory), (Error, Memory)>) {
     match x {
         Ok((e, m)) => match e {
-            Expr::Func(_) => Err(Error::CannotPrint(String::from("function"))),
+            Expr::Func(_) => println!("{}", Error::CannotPrint(String::from("function"))),
             Expr::Var(v) => match m.get(&v) {
-                Ok(val) => Ok(println!("{}", val)),
-                Err(e) => Err(e),
+                Ok(val) => println!("{}", val),
+                Err(e) => println!("{}", e),
             },
-            _ => Ok(println!("{}", e)),
+            _ => println!("{}", e),
         },
-        Err((e, _)) => Ok(println!("{}", e)),
+        Err((e, _)) => println!("{}", e),
     }
 }
 
@@ -473,11 +495,8 @@ fn repl() {
                         let evaled = eval(expr, mem.clone());
                         //print
                         if evaled.is_ok() {
-                            let e = print(evaled.clone());
+                            print(evaled.clone());
                             mem = evaled.unwrap().1;
-                            if e.is_err() {
-                                eprint!("{}", e.unwrap_err());
-                            }
                         }
                     }
                     Err(e) => println!("{}", e),
@@ -650,5 +669,27 @@ mod tests {
         let second = mem.insert(&String::from("a"), Expr::Bool(true));
         assert_eq!(first, ());
         assert_eq!(second, Err(Error::RedefiningVar(String::from("a"))));
+    }
+
+    fn eval_or_none(s: String) -> Option<Expr> {
+        let state = Memory::new();
+        let t = tokenize(s);
+        if t.is_err() {
+            return None;
+        }
+        let p = parse(t.unwrap());
+        if p.is_err() {
+            return None;
+        }
+        let e = eval(p.unwrap(), state);
+        match e {
+            Ok((val, _)) => Some(val),
+            Err(_) => None,
+        }
+    }
+
+    #[test]
+    fn eval_valid_add() {
+        assert_eq!(Expr::Num(3.0), eval_or_none("(+ 1 2)".to_string()).unwrap());
     }
 }
