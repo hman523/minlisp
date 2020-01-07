@@ -48,25 +48,50 @@ impl Memory {
         };
     }
 
+    fn arity_type_check(
+        name: String,
+        list: LinkedList<Expr>,
+        arity: usize,
+        types: Vec<String>,
+    ) -> Result<(), Error> {
+        if list.len() != arity {
+            return Err(Error::ArityMismatch(name, list.len(), 2));
+        }
+        for (i, val) in list.iter().enumerate() {
+            if get_type_name(val.clone()) != *types.get(i).unwrap() {
+                return Err(Error::TypeError(
+                    name,
+                    val.clone(),
+                    get_type_name(val.clone()),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     pub fn default_env() -> HashMap<String, Expr> {
         let mut values = HashMap::new();
         values.insert(String::from("PI"), Expr::Num(std::f64::consts::PI));
+        // Add Function
         values.insert(
             String::from("+"),
             Expr::Func(|lst| -> Result<Expr, Error> {
                 let mut list = lst.clone();
-                if list.len() != 2 {
-                    return Err(Error::ArityMismatch("+".to_string(), list.len(), 2));
+                let check = Memory::arity_type_check(
+                    String::from("+"),
+                    list.clone(),
+                    2,
+                    vec!["Num".to_string(), "Num".to_string()],
+                );
+                if check.is_err() {
+                    return Err(check.unwrap_err());
                 }
-                if let Some(Expr::Num(a)) = list.pop_front() {
-                    if let Some(Expr::Num(b)) = list.pop_front() {
+                if let Expr::Num(a) = list.pop_front().unwrap() {
+                    if let Expr::Num(b) = list.pop_front().unwrap() {
                         return Ok(Expr::Num(a + b));
                     }
-                    let b = list.pop_front().unwrap();
-                    return Err(Error::TypeError("+".to_string(), b, "Num".to_string()));
                 }
-                let a = list.pop_front().unwrap();
-                return Err(Error::TypeError("+".to_string(), a, "Num".to_string()));
+                panic!("Error in add function");
             }),
         );
         values
