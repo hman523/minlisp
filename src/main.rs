@@ -91,9 +91,32 @@ impl Memory {
                         return Ok(Expr::Num(a + b));
                     }
                 }
-                panic!("Error in add function");
+                panic!("Error in + function");
             }),
         );
+        // subtract function
+        values.insert(
+            String::from("-"),
+            Expr::Func(|lst| -> Result<Expr, Error> {
+                let mut list = lst.clone();
+                let check = Memory::arity_type_check(
+                    String::from("-"),
+                    list.clone(),
+                    2,
+                    vec!["Num".to_string(), "Num".to_string()],
+                );
+                if check.is_err() {
+                    return Err(check.unwrap_err());
+                }
+                if let Expr::Num(a) = list.pop_front().unwrap() {
+                    if let Expr::Num(b) = list.pop_front().unwrap() {
+                        return Ok(Expr::Num(a - b));
+                    }
+                }
+                panic!("Error in - function");
+            }),
+        );
+
         values
     }
 
