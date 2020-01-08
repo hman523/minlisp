@@ -116,6 +116,28 @@ impl Memory {
                 panic!("Error in - function");
             }),
         );
+        // multiply function
+        values.insert(
+            String::from("*"),
+            Expr::Func(|lst| -> Result<Expr, Error> {
+                let mut list = lst.clone();
+                let check = Memory::arity_type_check(
+                    String::from("*"),
+                    list.clone(),
+                    2,
+                    vec!["Num".to_string(), "Num".to_string()],
+                );
+                if check.is_err() {
+                    return Err(check.unwrap_err());
+                }
+                if let Expr::Num(a) = list.pop_front().unwrap() {
+                    if let Expr::Num(b) = list.pop_front().unwrap() {
+                        return Ok(Expr::Num(a * b));
+                    }
+                }
+                panic!("Error in * function");
+            }),
+        );
 
         values
     }
@@ -775,10 +797,21 @@ mod tests {
 
     #[test]
     fn eval_valid_add() {
-        assert_eq!(Expr::Num(3.0), eval_or_none("(+ 1 2)".to_string()).unwrap());
         assert_eq!(
             Expr::Num(3.0),
-            eval_or_none("(+ 1 (+ 1 1))".to_string()).unwrap()
+            eval_or_none(String::from("(+ 1 2)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Num(3.0),
+            eval_or_none(String::from("(+ 1 (+ 1 1))")).unwrap()
+        );
+    }
+
+    #[test]
+    fn eval_valid_math() {
+        assert_eq!(
+            Expr::Num(1.0),
+            eval_or_none(String::from("(- 2 (* 1 1))")).unwrap()
         );
     }
 }
