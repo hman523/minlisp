@@ -48,27 +48,6 @@ impl Memory {
         };
     }
 
-    fn arity_type_check(
-        name: String,
-        list: LinkedList<Expr>,
-        arity: usize,
-        types: Vec<String>,
-    ) -> Result<(), Error> {
-        if list.len() != arity {
-            return Err(Error::ArityMismatch(name, list.len(), 2));
-        }
-        for (i, val) in list.iter().enumerate() {
-            if get_type_name(val.clone()) != *types.get(i).unwrap() {
-                return Err(Error::TypeError(
-                    name,
-                    val.clone(),
-                    get_type_name(val.clone()),
-                ));
-            }
-        }
-        Ok(())
-    }
-
     pub fn default_env() -> HashMap<String, Expr> {
         let mut values = HashMap::new();
         values.insert(String::from("PI"), Expr::Num(std::f64::consts::PI));
@@ -77,10 +56,9 @@ impl Memory {
             String::from("+"),
             Expr::Func(|lst| -> Result<Expr, Error> {
                 let mut list = lst.clone();
-                let check = Memory::arity_type_check(
+                let check = arity_type_check(
                     String::from("+"),
                     list.clone(),
-                    2,
                     vec!["Num".to_string(), "Num".to_string()],
                 );
                 if check.is_err() {
@@ -99,10 +77,9 @@ impl Memory {
             String::from("-"),
             Expr::Func(|lst| -> Result<Expr, Error> {
                 let mut list = lst.clone();
-                let check = Memory::arity_type_check(
+                let check = arity_type_check(
                     String::from("-"),
                     list.clone(),
-                    2,
                     vec!["Num".to_string(), "Num".to_string()],
                 );
                 if check.is_err() {
@@ -121,10 +98,9 @@ impl Memory {
             String::from("*"),
             Expr::Func(|lst| -> Result<Expr, Error> {
                 let mut list = lst.clone();
-                let check = Memory::arity_type_check(
+                let check = arity_type_check(
                     String::from("*"),
                     list.clone(),
-                    2,
                     vec!["Num".to_string(), "Num".to_string()],
                 );
                 if check.is_err() {
@@ -152,6 +128,23 @@ impl Memory {
             None => Ok(()),
         }
     }
+}
+
+fn arity_type_check(name: String, list: LinkedList<Expr>, types: Vec<String>) -> Result<(), Error> {
+    if list.len() != types.len() {
+        return Err(Error::ArityMismatch(name, list.len(), types.len()));
+    }
+    for (i, val) in list.iter().enumerate() {
+        if get_type_name(val.clone()) != *types.get(i).unwrap() {
+            return Err(Error::TypeError(
+                name,
+                val.clone(),
+                get_type_name(val.clone()),
+                i + 1,
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Expr Enum
@@ -224,8 +217,8 @@ fn get_type_name(e: Expr) -> String {
 /// Some contain a string for the variable part of the error
 #[derive(Clone, Debug, PartialEq)]
 enum Error {
-    //fn name, given variable, expected type
-    TypeError(String, Expr, String),
+    //fn name, given variable, expected type, position
+    TypeError(String, Expr, String, usize),
     //fn name
     NotAProcedure(String),
     NotAVariable(String),
@@ -242,14 +235,16 @@ enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.clone() {
-            Error::TypeError(func, given, expected) => write!(
+            Error::TypeError(func, given, expected, pos) => write!(
                 f,
                 "Type error in function {}\n\
-                 \tExpected type:{}\n\
-                 \tGiven type:{}",
+                 \tExpected type: {}\n\
+                 \tGiven type: {}\n\
+                 \tIn parameter number {}",
                 func,
                 expected,
-                get_type_name(given)
+                get_type_name(given),
+                pos
             ),
             Error::NotAProcedure(func) => write!(f, "Unable to call {}, function not found", func),
             Error::NotAVariable(name) => write!(f, "Variable {} does not exist", name),
@@ -449,7 +444,11 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
                 return Err((Error::NoFuncGiven(), current_state));
             }
             let func = func.unwrap();
-            return apply(current_state, func, list);
+            let ifstr = "if".to_string();
+            match func {
+                Expr::Var(ifstr) => eval_if(current_state, list),
+                _ => apply(current_state, func, list),
+            }
         }
         Expr::Num(n) => {
             return Ok((Expr::Num(n), current_state));
@@ -467,6 +466,36 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
             Some(val) => Ok((val, current_state)),
             None => Err((Error::NotAVariable(v), current_state)),
         },
+    }
+}
+
+fn eval_if(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Error, Memory)> {
+    let mut new_state = state.clone();
+    let mut list = list.clone();
+    if list.len() != 3 {
+        return Err((
+            Error::ArityMismatch(String::from("if"), list.len(), 3),
+            new_state,
+        ));
+    }
+    let e = list.pop_front().unwrap();
+    let cond = eval_to_bool(e.clone(), new_state.clone());
+    if cond.is_none() {
+        return Err((
+            Error::TypeError("if".to_string(), e, "Bool".to_string(), 1),
+            new_state,
+        ));
+    }
+    let (cond, new_state) = cond.unwrap();
+    todo!("eval_if");
+}
+
+fn eval_to_bool(e: Expr, state: Memory) -> Option<(bool, Memory)> {
+    dbg!("In eval_to_bool");
+    match e {
+        Expr::Bool(b) => Ok(b),
+        Expr::List(_) | Expr::Var(_) => eval_to_bool(eval(e, state)),
+        _ => None,
     }
 }
 
