@@ -114,6 +114,46 @@ impl Memory {
                 panic!("Error in * function");
             }),
         );
+        values.insert(
+            String::from("/"),
+            Expr::Func(|lst| -> Result<Expr, Error> {
+                let mut list = lst.clone();
+                let check = arity_type_check(
+                    String::from("/"),
+                    list.clone(),
+                    vec!["Num".to_string(), "Num".to_string()],
+                );
+                if check.is_err() {
+                    return Err(check.unwrap_err());
+                }
+                if let Expr::Num(a) = list.pop_front().unwrap() {
+                    if let Expr::Num(b) = list.pop_front().unwrap() {
+                        return Ok(Expr::Num(a / b));
+                    }
+                }
+                panic!("Error in / function");
+            }),
+        );
+        values.insert(
+            String::from("="),
+            Expr::Func(|lst| -> Result<Expr, Error> {
+                let mut list = lst.clone();
+                let check = arity_type_check(
+                    String::from("="),
+                    list.clone(),
+                    vec!["Num".to_string(), "Num".to_string()],
+                );
+                if check.is_err() {
+                    return Err(check.unwrap_err());
+                }
+                if let Expr::Num(a) = list.pop_front().unwrap() {
+                    if let Expr::Num(b) = list.pop_front().unwrap() {
+                        return Ok(Expr::Bool(a == b));
+                    }
+                }
+                panic!("Error in / function");
+            }),
+        );
 
         values
     }
@@ -858,6 +898,18 @@ mod tests {
     }
 
     #[test]
+    fn test_numeric_comparison() {
+        assert_eq!(
+            Expr::Bool(true),
+            eval_or_none(String::from("(= 1 1)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(false),
+            eval_or_none(String::from("(= 2 1)")).unwrap()
+        );
+    }
+
+    #[test]
     fn test_if() {
         assert_eq!(
             Expr::Num(1.0),
@@ -874,6 +926,14 @@ mod tests {
         assert_eq!(
             Expr::Str("Hello".to_string()),
             eval_or_none(String::from("(if #f 1 \"Hello\")")).unwrap()
+        );
+        assert_eq!(
+            Expr::Num(1.0),
+            eval_or_none(String::from("(if (= 1 1) 1 2)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Num(2.0),
+            eval_or_none(String::from("(if (= 1 2) 1 2)")).unwrap()
         );
     }
 }
