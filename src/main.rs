@@ -856,4 +856,24 @@ mod tests {
             eval_or_none(String::from("(- 2 (* 1 1))")).unwrap()
         );
     }
+
+    #[test]
+    fn test_if() {
+        assert_eq!(
+            Expr::Num(1.0),
+            eval_or_none(String::from("(if #t 1 2)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Num(2.0),
+            eval_or_none(String::from("(if #f 1 2)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Num(2.0),
+            eval_or_none(String::from("(+ 1 (if #t 1 2))")).unwrap()
+        );
+        assert_eq!(
+            Expr::Str("Hello".to_string()),
+            eval_or_none(String::from("(if #f 1 \"Hello\")")).unwrap()
+        );
+    }
 }
