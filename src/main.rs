@@ -444,10 +444,11 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
                 return Err((Error::NoFuncGiven(), current_state));
             }
             let func = func.unwrap();
-            let ifstr = "if".to_string();
-            match func {
-                Expr::Var(ifstr) => eval_if(current_state, list),
-                _ => apply(current_state, func, list),
+            let if_sym = Expr::Var("if".to_string());
+            if func == if_sym {
+                return eval_if(current_state, list);
+            } else {
+                return apply(current_state, func, list);
             }
         }
         Expr::Num(n) => {
@@ -487,14 +488,26 @@ fn eval_if(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Err
         ));
     }
     let (cond, new_state) = cond.unwrap();
-    todo!("eval_if");
+    let first = list.pop_front().unwrap();
+    let second = list.pop_front().unwrap();
+    if cond {
+        return eval(first, new_state);
+    } else {
+        return eval(second, new_state);
+    }
 }
 
 fn eval_to_bool(e: Expr, state: Memory) -> Option<(bool, Memory)> {
-    dbg!("In eval_to_bool");
     match e {
-        Expr::Bool(b) => Ok(b),
-        Expr::List(_) | Expr::Var(_) => eval_to_bool(eval(e, state)),
+        Expr::Bool(b) => Some((b, state)),
+        Expr::List(_) | Expr::Var(_) => {
+            let res = eval(e, state);
+            if res.is_err() {
+                return None;
+            }
+            let (result, mem) = res.unwrap();
+            eval_to_bool(result, mem)
+        }
         _ => None,
     }
 }
