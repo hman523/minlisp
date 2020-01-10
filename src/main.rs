@@ -48,6 +48,12 @@ impl Memory {
         };
     }
 
+    /*
+    fn create_math_fn(name: &String, f: &dyn Fn(f64, f64) -> f64)
+        -> impl Fn(LinkedList<Expr>) -> Result<Expr, Error> {
+        todo!()
+    }*/
+
     pub fn default_env() -> HashMap<String, Expr> {
         let mut values = HashMap::new();
         values.insert(String::from("PI"), Expr::Num(std::f64::consts::PI));
@@ -151,7 +157,7 @@ impl Memory {
                         return Ok(Expr::Bool(a == b));
                     }
                 }
-                panic!("Error in / function");
+                panic!("Error in = function");
             }),
         );
 
@@ -179,7 +185,7 @@ fn arity_type_check(name: String, list: LinkedList<Expr>, types: Vec<String>) ->
             return Err(Error::TypeError(
                 name,
                 val.clone(),
-                get_type_name(val.clone()),
+                (*types.get(i).unwrap()).to_string(),
                 i + 1,
             ));
         }
