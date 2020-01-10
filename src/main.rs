@@ -48,11 +48,26 @@ impl Memory {
         };
     }
 
-    /*
-    fn create_math_fn(name: &String, f: &dyn Fn(f64, f64) -> f64)
-        -> impl Fn(LinkedList<Expr>) -> Result<Expr, Error> {
-        todo!()
-    }*/
+    fn math_fn<F>(name: String, lst: LinkedList<Expr>, f: F) -> Result<Expr, Error>
+    where
+        F: Fn(f64, f64) -> f64,
+    {
+        let mut list = lst.clone();
+        let check = arity_type_check(
+            name.to_string(),
+            list.clone(),
+            vec!["Num".to_string(), "Num".to_string()],
+        );
+        if check.is_err() {
+            return Err(check.unwrap_err());
+        }
+        if let Expr::Num(a) = list.pop_front().unwrap() {
+            if let Expr::Num(b) = list.pop_front().unwrap() {
+                return Ok(Expr::Num(f(a, b)));
+            }
+        }
+        panic!("Error in {} function", name.to_string());
+    }
 
     pub fn default_env() -> HashMap<String, Expr> {
         let mut values = HashMap::new();
@@ -61,83 +76,41 @@ impl Memory {
         values.insert(
             String::from("+"),
             Expr::Func(|lst| -> Result<Expr, Error> {
-                let mut list = lst.clone();
-                let check = arity_type_check(
-                    String::from("+"),
-                    list.clone(),
-                    vec!["Num".to_string(), "Num".to_string()],
-                );
-                if check.is_err() {
-                    return Err(check.unwrap_err());
-                }
-                if let Expr::Num(a) = list.pop_front().unwrap() {
-                    if let Expr::Num(b) = list.pop_front().unwrap() {
-                        return Ok(Expr::Num(a + b));
-                    }
-                }
-                panic!("Error in + function");
+                Memory::math_fn(String::from("+"), lst.clone(), |a: f64, b: f64| -> f64 {
+                    a + b
+                })
             }),
         );
-        // subtract function
         values.insert(
             String::from("-"),
             Expr::Func(|lst| -> Result<Expr, Error> {
-                let mut list = lst.clone();
-                let check = arity_type_check(
-                    String::from("-"),
-                    list.clone(),
-                    vec!["Num".to_string(), "Num".to_string()],
-                );
-                if check.is_err() {
-                    return Err(check.unwrap_err());
-                }
-                if let Expr::Num(a) = list.pop_front().unwrap() {
-                    if let Expr::Num(b) = list.pop_front().unwrap() {
-                        return Ok(Expr::Num(a - b));
-                    }
-                }
-                panic!("Error in - function");
+                Memory::math_fn(String::from("-"), lst.clone(), |a: f64, b: f64| -> f64 {
+                    a - b
+                })
             }),
         );
-        // multiply function
         values.insert(
             String::from("*"),
             Expr::Func(|lst| -> Result<Expr, Error> {
-                let mut list = lst.clone();
-                let check = arity_type_check(
-                    String::from("*"),
-                    list.clone(),
-                    vec!["Num".to_string(), "Num".to_string()],
-                );
-                if check.is_err() {
-                    return Err(check.unwrap_err());
-                }
-                if let Expr::Num(a) = list.pop_front().unwrap() {
-                    if let Expr::Num(b) = list.pop_front().unwrap() {
-                        return Ok(Expr::Num(a * b));
-                    }
-                }
-                panic!("Error in * function");
+                Memory::math_fn(String::from("*"), lst.clone(), |a: f64, b: f64| -> f64 {
+                    a * b
+                })
             }),
         );
         values.insert(
             String::from("/"),
             Expr::Func(|lst| -> Result<Expr, Error> {
-                let mut list = lst.clone();
-                let check = arity_type_check(
-                    String::from("/"),
-                    list.clone(),
-                    vec!["Num".to_string(), "Num".to_string()],
-                );
-                if check.is_err() {
-                    return Err(check.unwrap_err());
-                }
-                if let Expr::Num(a) = list.pop_front().unwrap() {
-                    if let Expr::Num(b) = list.pop_front().unwrap() {
-                        return Ok(Expr::Num(a / b));
-                    }
-                }
-                panic!("Error in / function");
+                Memory::math_fn(String::from("/"), lst.clone(), |a: f64, b: f64| -> f64 {
+                    a / b
+                })
+            }),
+        );
+        values.insert(
+            String::from("expt"),
+            Expr::Func(|lst| -> Result<Expr, Error> {
+                Memory::math_fn(String::from("expt"), lst.clone(), |a: f64, b: f64| -> f64 {
+                    a.powf(b)
+                })
             }),
         );
         values.insert(
