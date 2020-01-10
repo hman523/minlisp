@@ -881,7 +881,7 @@ mod tests {
     }
 
     #[test]
-    fn test_numeric_comparison() {
+    fn test_numeric_equality() {
         assert_eq!(
             Expr::Bool(true),
             eval_or_none(String::from("(= 1 1)")).unwrap()
@@ -889,6 +889,50 @@ mod tests {
         assert_eq!(
             Expr::Bool(false),
             eval_or_none(String::from("(= 2 1)")).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_numeric_comparison() {
+        assert_eq!(
+            Expr::Bool(true),
+            eval_or_none(String::from("(/= 1 0)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(false),
+            eval_or_none(String::from("(/= 1 1)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(true),
+            eval_or_none(String::from("(< 0 1)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(false),
+            eval_or_none(String::from("(< 1 0)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(true),
+            eval_or_none(String::from("(> 1 0)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(false),
+            eval_or_none(String::from("(> 0 1)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(true),
+            eval_or_none(String::from("(>= 1 0)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(false),
+            eval_or_none(String::from("(>= 0 1)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(true),
+            eval_or_none(String::from("(<= 0 1)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(false),
+            eval_or_none(String::from("(<= 1 0)")).unwrap()
         );
     }
 
