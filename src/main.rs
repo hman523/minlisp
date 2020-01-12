@@ -42,52 +42,52 @@ impl Memory {
                 };
             }
         }
-        return match self.vars.get(s) {
+        match self.vars.get(s) {
             Some(v) => Some(v.clone()),
             None => None,
-        };
+        }
     }
 
     fn math_fn<F>(name: String, lst: LinkedList<Expr>, f: F) -> Result<Expr, Error>
     where
         F: Fn(f64, f64) -> f64,
     {
-        let mut list = lst.clone();
+        let mut list = lst;
         let check = arity_type_check(
             name.to_string(),
             list.clone(),
             vec!["Num".to_string(), "Num".to_string()],
         );
-        if check.is_err() {
-            return Err(check.unwrap_err());
+        if let Err(err) = check {
+            return Err(err);
         }
         if let Expr::Num(a) = list.pop_front().unwrap() {
             if let Expr::Num(b) = list.pop_front().unwrap() {
                 return Ok(Expr::Num(f(a, b)));
             }
         }
-        panic!("Error in {} function", name.to_string());
+        panic!("Error in {} function", name);
     }
 
     fn comp_fn<F>(name: String, lst: LinkedList<Expr>, f: F) -> Result<Expr, Error>
     where
         F: Fn(f64, f64) -> bool,
     {
-        let mut list = lst.clone();
+        let mut list = lst;
         let check = arity_type_check(
             name.to_string(),
             list.clone(),
             vec!["Num".to_string(), "Num".to_string()],
         );
-        if check.is_err() {
-            return Err(check.unwrap_err());
+        if let Err(err) = check {
+            return Err(err);
         }
         if let Expr::Num(a) = list.pop_front().unwrap() {
             if let Expr::Num(b) = list.pop_front().unwrap() {
                 return Ok(Expr::Bool(f(a, b)));
             }
         }
-        panic!("Error in {} function", name.to_string());
+        panic!("Error in {} function", name);
     }
 
     pub fn default_env() -> HashMap<String, Expr> {
@@ -116,11 +116,19 @@ impl Memory {
         );
         values.insert(
             String::from("="),
-            Expr::Func(|lst| Memory::comp_fn(String::from("="), lst.clone(), |a, b| a == b)),
+            Expr::Func(|lst| {
+                Memory::comp_fn(String::from("="), lst.clone(), |a, b| {
+                    ((a - b).abs() < std::f64::EPSILON)
+                })
+            }),
         );
         values.insert(
             String::from("/="),
-            Expr::Func(|lst| Memory::comp_fn(String::from("/="), lst.clone(), |a, b| a != b)),
+            Expr::Func(|lst| {
+                Memory::comp_fn(String::from("/="), lst.clone(), |a, b| {
+                    (a - b).abs() > std::f64::EPSILON
+                })
+            }),
         );
         values.insert(
             String::from("<"),
@@ -144,10 +152,10 @@ impl Memory {
     /// insert function
     /// returns either an empty tuple on success or an error if redefing
     /// a variable
-    pub fn insert(&mut self, s: &String, e: Expr) -> Result<(), Error> {
-        let exists = self.vars.insert(s.clone(), e);
+    pub fn insert(&mut self, s: &str, e: Expr) -> Result<(), Error> {
+        let exists = self.vars.insert(s.to_string(), e);
         match exists {
-            Some(_) => Err(Error::RedefiningVar(s.clone())),
+            Some(_) => Err(Error::RedefiningVar(s.to_string())),
             None => Ok(()),
         }
     }
@@ -159,7 +167,7 @@ fn arity_type_check(name: String, list: LinkedList<Expr>, types: Vec<String>) ->
     }
     for (i, val) in list.iter().enumerate() {
         if get_type_name(val.clone()) != *types.get(i).unwrap() {
-            return Err(Error::TypeError(
+            return Err(Error::TypeMismatch(
                 name,
                 val.clone(),
                 (*types.get(i).unwrap()).to_string(),
@@ -241,7 +249,7 @@ fn get_type_name(e: Expr) -> String {
 #[derive(Clone, Debug, PartialEq)]
 enum Error {
     //fn name, given variable, expected type, position
-    TypeError(String, Expr, String, usize),
+    TypeMismatch(String, Expr, String, usize),
     //fn name
     NotAProcedure(String),
     NotAVariable(String),
@@ -258,7 +266,7 @@ enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.clone() {
-            Error::TypeError(func, given, expected, pos) => write!(
+            Error::TypeMismatch(func, given, expected, pos) => write!(
                 f,
                 "Type error in function {}\n\
                  \tExpected type: {}\n\
@@ -391,7 +399,7 @@ fn parse_expr(token: String) -> Expr {
 /// implementation of the rust lisp interpreter
 fn read_seq(tokens: Tokens) -> Result<(Expr, Tokens), Error> {
     let mut result: LinkedList<Expr> = LinkedList::new();
-    let mut ts = tokens.clone();
+    let mut ts = tokens;
     loop {
         let (next, rest) = ts.split_first().ok_or(Error::OpenParenMissing())?;
         if next == ")" {
@@ -443,7 +451,7 @@ fn parse(tokens: Tokens) -> Result<Expr, Error> {
 }
 
 fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memory)> {
-    let mut current_state = state.clone();
+    let mut current_state = state;
     match expression {
         Expr::Lines(lines) => {
             let mut result = Err((Error::EvalCalledOnNothing(), current_state.clone()));
@@ -459,7 +467,7 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
                     return result;
                 }
             }
-            return result;
+            result
         }
         Expr::List(mut list) => {
             let func = list.pop_front();
@@ -467,25 +475,18 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
                 return Err((Error::NoFuncGiven(), current_state));
             }
             let func = func.unwrap();
-            let if_sym = Expr::Var("if".to_string());
-            if func == if_sym {
-                return eval_if(current_state, list);
-            } else {
-                return apply(current_state, func, list);
+            if func == Expr::Var("if".to_string()) {
+                eval_if(current_state, list)
+            } else if func == Expr::Var("set".to_string()) {
+				eval_set(current_state, list)
+			} else {
+                apply(current_state, func, list)
             }
         }
-        Expr::Num(n) => {
-            return Ok((Expr::Num(n), current_state));
-        }
-        Expr::Bool(b) => {
-            return Ok((Expr::Bool(b), current_state));
-        }
-        Expr::Str(s) => {
-            return Ok((Expr::Str(s), current_state));
-        }
-        Expr::Func(f) => {
-            return Ok((Expr::Func(f), current_state));
-        }
+        Expr::Num(n) => Ok((Expr::Num(n), current_state)),
+        Expr::Bool(b) => Ok((Expr::Bool(b), current_state)),
+        Expr::Str(s) => Ok((Expr::Str(s), current_state)),
+        Expr::Func(f) => Ok((Expr::Func(f), current_state)),
         Expr::Var(v) => match current_state.get(&v) {
             Some(val) => Ok((val, current_state)),
             None => Err((Error::NotAVariable(v), current_state)),
@@ -493,9 +494,13 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
     }
 }
 
+fn eval_set(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Error, Memory)>{
+	todo!();
+}
+
 fn eval_if(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Error, Memory)> {
-    let mut new_state = state.clone();
-    let mut list = list.clone();
+    let new_state = state;
+    let mut list = list;
     if list.len() != 3 {
         return Err((
             Error::ArityMismatch(String::from("if"), list.len(), 3),
@@ -506,18 +511,14 @@ fn eval_if(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Err
     let cond = eval_to_bool(e.clone(), new_state.clone());
     if cond.is_none() {
         return Err((
-            Error::TypeError("if".to_string(), e, "Bool".to_string(), 1),
+            Error::TypeMismatch("if".to_string(), e, "Bool".to_string(), 1),
             new_state,
         ));
     }
     let (cond, new_state) = cond.unwrap();
     let first = list.pop_front().unwrap();
     let second = list.pop_front().unwrap();
-    if cond {
-        return eval(first, new_state);
-    } else {
-        return eval(second, new_state);
-    }
+    eval(if cond { first } else { second }, new_state)
 }
 
 fn eval_to_bool(e: Expr, state: Memory) -> Option<(bool, Memory)> {
@@ -537,7 +538,7 @@ fn eval_to_bool(e: Expr, state: Memory) -> Option<(bool, Memory)> {
 
 fn eval_list(list: LinkedList<Expr>, state: Memory) -> Result<(Expr, Memory), (Error, Memory)> {
     let mut returned_list: LinkedList<Expr> = LinkedList::new();
-    let mut current_state = state.clone();
+    let mut current_state = state;
     for i in list {
         if let Expr::List(_) = i {
             let evaled = eval(i, current_state);
@@ -568,7 +569,6 @@ fn apply(
     f: Expr,
     params: LinkedList<Expr>,
 ) -> Result<(Expr, Memory), (Error, Memory)> {
-    let mut new_state = state.clone();
     let params = eval_list(params, state.clone());
     if params.is_err() {
         return params;
@@ -581,11 +581,10 @@ fn apply(
     match f {
         Expr::Func(func) => {
             let res = func(&params);
-            let result = match res {
+            match res {
                 Ok(e) => Ok((e, new_state)),
                 Err(e) => Err((e, new_state)),
-            };
-            return result;
+            }
         }
         Expr::Var(var) => {
             let func = new_state.get(&var);
@@ -597,11 +596,10 @@ fn apply(
                 Expr::Func(function) => function(&params),
                 _ => Err(Error::NotAProcedure(func.to_string())),
             };
-            let result = match res {
+            match res {
                 Ok(e) => Ok((e, new_state)),
                 Err(e) => Err((e, new_state)),
-            };
-            return result;
+            }
         }
         _ => Err((Error::NotAProcedure(f.to_string()), new_state)),
     }
@@ -640,6 +638,7 @@ fn repl() {
         //read
         let readline = rl.readline("> ");
         let mut input = String::new();
+		print!("{}", &input); //To stop a warning that isn't real
         match readline {
             Ok(r) => {
                 input = r;
