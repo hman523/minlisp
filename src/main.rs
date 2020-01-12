@@ -478,8 +478,8 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
             if func == Expr::Var("if".to_string()) {
                 eval_if(current_state, list)
             } else if func == Expr::Var("set".to_string()) {
-				eval_set(current_state, list)
-			} else {
+                eval_set(current_state, list)
+            } else {
                 apply(current_state, func, list)
             }
         }
@@ -494,8 +494,8 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
     }
 }
 
-fn eval_set(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Error, Memory)>{
-	todo!();
+fn eval_set(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Error, Memory)> {
+    todo!();
 }
 
 fn eval_if(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Error, Memory)> {
@@ -638,7 +638,7 @@ fn repl() {
         //read
         let readline = rl.readline("> ");
         let mut input = String::new();
-		print!("{}", &input); //To stop a warning that isn't real
+        print!("{}", &input); //To stop a warning that isn't real
         match readline {
             Ok(r) => {
                 input = r;
