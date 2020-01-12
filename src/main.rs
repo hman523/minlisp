@@ -27,7 +27,12 @@ impl Memory {
     pub fn new() -> Memory {
         Memory {
             vars: Memory::default_env(),
-            call_stack: LinkedList::new(),
+            call_stack: {
+                let mut c = LinkedList::new();
+                let hm = HashMap::new();
+                c.push_front(hm);
+                c
+            },
         }
     }
 
@@ -45,6 +50,21 @@ impl Memory {
         match self.vars.get(s) {
             Some(v) => Some(v.clone()),
             None => None,
+        }
+    }
+
+    /// insert function
+    /// returns either an empty tuple on success or an error if redefing
+    /// a variable
+    pub fn insert(&mut self, s: &str, e: Expr) -> Result<(), Error> {
+        let exists = self
+            .call_stack
+            .front_mut()
+            .unwrap()
+            .insert(s.to_string(), e);
+        match exists {
+            Some(_) => Err(Error::RedefiningVar(s.to_string())),
+            None => Ok(()),
         }
     }
 
@@ -147,17 +167,6 @@ impl Memory {
             Expr::Func(|lst| Memory::comp_fn(String::from("<="), lst.clone(), |a, b| a <= b)),
         );
         values
-    }
-
-    /// insert function
-    /// returns either an empty tuple on success or an error if redefing
-    /// a variable
-    pub fn insert(&mut self, s: &str, e: Expr) -> Result<(), Error> {
-        let exists = self.vars.insert(s.to_string(), e);
-        match exists {
-            Some(_) => Err(Error::RedefiningVar(s.to_string())),
-            None => Ok(()),
-        }
     }
 }
 
@@ -495,7 +504,27 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
 }
 
 fn eval_set(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Error, Memory)> {
-    todo!();
+    let mut new_state = state;
+    let mut list = list;
+    if list.len() != 2 {
+        return Err((
+            Error::ArityMismatch(String::from("set"), list.len(), 2),
+            new_state,
+        ));
+    }
+    let e = list.pop_front().unwrap();
+    if let Expr::Var(symbol) = e {
+        let expr = list.pop_front().unwrap();
+        if let Err(err) = new_state.insert(&symbol, expr.clone()) {
+            return Err((err, new_state));
+        }
+        return Ok((expr, new_state));
+    } else {
+        return Err((
+            Error::TypeMismatch("set".to_string(), e, "Var".to_string(), 1),
+            new_state,
+        ));
+    }
 }
 
 fn eval_if(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Error, Memory)> {
@@ -829,7 +858,9 @@ mod tests {
     #[test]
     fn test_memory_get_insert() {
         let mut mem = Memory::new();
-        mem.insert(&String::from("a"), Expr::Bool(true));
+        if mem.insert(&String::from("a"), Expr::Bool(true)).is_err() {
+            panic!("Error should not happen on this insert");
+        }
         assert_eq!(mem.get(&String::from("a")).unwrap(), Expr::Bool(true));
     }
 
