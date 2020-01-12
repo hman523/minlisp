@@ -993,4 +993,17 @@ mod tests {
             eval_or_none(String::from("(if (= 1 2) 1 2)")).unwrap()
         );
     }
+
+    #[test]
+    fn test_set() {
+        assert_eq!(
+            Expr::Num(3.0),
+            eval_or_none(String::from("(set a 3)")).unwrap()
+        );
+        assert_eq!(None, eval_or_none(String::from("(set a 3) (set a 4)")));
+        assert_eq!(
+            Expr::Bool(true),
+            eval_or_none(String::from("(set a #t) a")).unwrap()
+        );
+    }
 }
