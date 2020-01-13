@@ -6,7 +6,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::collections::HashMap;
 use std::collections::LinkedList;
-use std::rc::Rc;
+use std::sync::Arc;
 
 type Tokens = Vec<String>;
 
@@ -270,14 +270,14 @@ fn get_type_name(e: Expr) -> String {
 #[derive(Clone, Debug, PartialEq)]
 struct LambdaExpr {
     params: LinkedList<String>,
-    body: Rc<Expr>,
+    body: Arc<Expr>,
 }
 
 impl LambdaExpr {
     pub fn new(par: LinkedList<String>, bod: Expr) -> LambdaExpr {
         LambdaExpr {
             params: par,
-            body: Rc::new(bod),
+            body: Arc::new(bod),
         }
     }
 }
@@ -757,7 +757,7 @@ fn execute_lambda(
             return Err((Error::ParameterRepeats(), state));
         }
     }
-    let res = eval(Rc::try_unwrap(lambda.body).unwrap(), new_state);
+    let res = eval(Arc::try_unwrap(lambda.body).unwrap(), new_state);
     if res.is_err() {
         let (err, mut state) = res.unwrap_err();
         state.exit_fn();
