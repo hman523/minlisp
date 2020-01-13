@@ -6,6 +6,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::collections::HashMap;
 use std::collections::LinkedList;
+use std::rc::Rc;
 
 type Tokens = Vec<String>;
 
@@ -34,6 +35,15 @@ impl Memory {
                 c
             },
         }
+    }
+
+    pub fn enter_fn(&mut self) {
+        let new_scope = HashMap::new();
+        self.call_stack.push_front(new_scope);
+    }
+
+    pub fn exit_fn(&mut self) {
+        self.call_stack.pop_front();
     }
 
     /// get function
@@ -197,6 +207,7 @@ enum Expr {
     Bool(bool),
     Num(f64),
     Func(fn(&LinkedList<Expr>) -> Result<Expr, Error>),
+    Lambda(LambdaExpr),
     List(LinkedList<Expr>),
     Lines(LinkedList<Expr>),
 }
@@ -224,6 +235,7 @@ impl std::fmt::Display for Expr {
             Expr::Bool(b) => write!(f, "#{}", (if b { "t" } else { "f" })),
             Expr::Num(n) => write!(f, "{}", n),
             Expr::Func(_) => Err(std::fmt::Error),
+            Expr::Lambda(_) => Err(std::fmt::Error),
             Expr::List(l) => write!(f, "{:?}", l),
             Expr::Lines(l) => write!(f, "{:?}", l),
         }
@@ -234,6 +246,7 @@ impl std::fmt::Debug for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             Expr::Func(_) => write!(f, "function"),
+            Expr::Lambda(l) => write!(f, "{:?}", l),
             _ => write!(f, "{}", self),
         }
     }
@@ -246,10 +259,26 @@ fn get_type_name(e: Expr) -> String {
         Expr::Bool(_) => "Bool",
         Expr::Num(_) => "Num",
         Expr::Func(_) => "Function",
+        Expr::Lambda(_) => "Lambda",
         Expr::List(_) => "List",
         Expr::Lines(_) => "Lines",
     }
     .to_string()
+}
+
+#[derive(Clone, Debug)]
+struct LambdaExpr {
+    params: LinkedList<String>,
+    body: Rc<Expr>,
+}
+
+impl LambdaExpr {
+    pub fn new(par: LinkedList<String>, bod: Expr) -> LambdaExpr {
+        LambdaExpr {
+            params: par,
+            body: Rc::new(bod),
+        }
+    }
 }
 
 /// Error Enum
@@ -488,6 +517,8 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
                 eval_if(current_state, list)
             } else if func == Expr::Var("set".to_string()) {
                 eval_set(current_state, list)
+            } else if func == Expr::Var("lambda".to_string()) {
+                eval_lambda(current_state, list)
             } else {
                 apply(current_state, func, list)
             }
@@ -496,10 +527,52 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
         Expr::Bool(b) => Ok((Expr::Bool(b), current_state)),
         Expr::Str(s) => Ok((Expr::Str(s), current_state)),
         Expr::Func(f) => Ok((Expr::Func(f), current_state)),
+        Expr::Lambda(l) => Ok((Expr::Lambda(l), current_state)),
         Expr::Var(v) => match current_state.get(&v) {
             Some(val) => Ok((val, current_state)),
             None => Err((Error::NotAVariable(v), current_state)),
         },
+    }
+}
+
+fn eval_lambda(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), (Error, Memory)> {
+    let mut list = list;
+    if list.len() != 2 {
+        return Err((
+            Error::ArityMismatch(String::from("lambda"), list.len(), 2),
+            state,
+        ));
+    }
+    let params = list.pop_front().unwrap();
+    if let Expr::List(parameters) = params.clone() {
+        let bod = list.pop_front().unwrap();
+        if let Expr::List(body) = bod.clone() {
+            let mut parameters_as_strings = LinkedList::new();
+            for i in parameters {
+                if let Expr::Var(var) = i {
+                    parameters_as_strings.push_back(var);
+                } else {
+                    return Err((
+                        Error::TypeMismatch(String::from("lambda"), i, "Var".to_string(), 1),
+                        state,
+                    ));
+                }
+            }
+            return Ok((
+                Expr::Lambda(LambdaExpr::new(parameters_as_strings, bod)),
+                state,
+            ));
+        } else {
+            return Err((
+                Error::TypeMismatch(String::from("lambda"), bod, "List".to_string(), 2),
+                state,
+            ));
+        }
+    } else {
+        return Err((
+            Error::TypeMismatch(String::from("lambda"), params, "List".to_string(), 1),
+            state,
+        ));
     }
 }
 
@@ -615,23 +688,54 @@ fn apply(
                 Err(e) => Err((e, new_state)),
             }
         }
+        Expr::Lambda(lambda) => execute_lambda(lambda, new_state, &params),
         Expr::Var(var) => {
             let func = new_state.get(&var);
             if func == None {
                 return Err((Error::NotAProcedure(var), state));
             }
             let func = func.unwrap();
-            let res = match func {
-                Expr::Func(function) => function(&params),
-                _ => Err(Error::NotAProcedure(func.to_string())),
-            };
-            match res {
-                Ok(e) => Ok((e, new_state)),
-                Err(e) => Err((e, new_state)),
+            match func {
+                Expr::Func(function) => match function(&params) {
+                    Ok(e) => Ok((e, new_state)),
+                    Err(e) => Err((e, new_state)),
+                },
+                Expr::Lambda(lambda) => execute_lambda(lambda, state, &params),
+                _ => Err((Error::NotAProcedure(func.to_string()), new_state)),
             }
         }
         _ => Err((Error::NotAProcedure(f.to_string()), new_state)),
     }
+}
+
+fn execute_lambda(
+    lambda: LambdaExpr,
+    state: Memory,
+    params: &LinkedList<Expr>,
+) -> Result<(Expr, Memory), (Error, Memory)> {
+    let mut new_state = state.clone();
+    let mut params = params.clone();
+    //First enter new scope
+    if lambda.params.len() != params.len() {
+        return Err((
+            Error::ArityMismatch(String::from("lambda"), params.len(), lambda.params.len()),
+            state,
+        ));
+    }
+    new_state.enter_fn();
+    //Now evaluate and populate the parameters
+    for item in lambda.params {
+        new_state.insert(&item, params.pop_front().unwrap());
+    }
+    let res = eval(Rc::try_unwrap(lambda.body).unwrap(), new_state);
+    if res.is_err() {
+        let (err, mut state) = res.unwrap_err();
+        state.exit_fn();
+        return Err((err, state));
+    }
+    let (result, mut new_state) = res.unwrap();
+    new_state.exit_fn();
+    Ok((result, new_state))
 }
 
 fn print(x: Result<(Expr, Memory), (Error, Memory)>) {
