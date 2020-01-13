@@ -300,7 +300,7 @@ enum Error {
     CannotPrint(String),
     NoFuncGiven(),
     EvalCalledOnNothing(),
-	ParameterRepeats(),
+    ParameterRepeats(),
 }
 
 impl std::fmt::Display for Error {
@@ -337,7 +337,7 @@ impl std::fmt::Display for Error {
             Error::CannotPrint(typeofval) => write!(f, "Cannot print type {}", typeofval),
             Error::NoFuncGiven() => write!(f, "Cannot call eval on empty string"),
             Error::EvalCalledOnNothing() => write!(f, "Cannot call eval on nothing"),
-			Error::ParameterRepeats() => write!(f, "Cannot repeat parameter name in lambda"),
+            Error::ParameterRepeats() => write!(f, "Cannot repeat parameter name in lambda"),
         }
     }
 }
@@ -750,12 +750,12 @@ fn execute_lambda(
     new_state.enter_fn();
     //Now evaluate and populate the parameters
     for item in lambda.params {
-        if new_state.insert(&item, params.pop_front().unwrap()).is_err() {
-			return Err((
-				Error::ParameterRepeats(),
-				state,
-			));
-		}
+        if new_state
+            .insert(&item, params.pop_front().unwrap())
+            .is_err()
+        {
+            return Err((Error::ParameterRepeats(), state));
+        }
     }
     let res = eval(Rc::try_unwrap(lambda.body).unwrap(), new_state);
     if res.is_err() {
