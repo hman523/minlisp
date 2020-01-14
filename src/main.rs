@@ -237,7 +237,14 @@ impl std::fmt::Display for Expr {
             Expr::Num(n) => write!(f, "{}", n),
             Expr::Func(_) => Err(std::fmt::Error),
             Expr::Lambda(_) => Err(std::fmt::Error),
-            Expr::List(l) => write!(f, "{:?}", l),
+            Expr::List(l) => write!(
+                f,
+                "{}",
+                format!("{:?}", l)
+                    .replace("[", "(")
+                    .replace("]", ")")
+                    .replace(",", "")
+            ),
             Expr::Lines(l) => write!(f, "{:?}", l),
         }
     }
@@ -522,6 +529,14 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
                 eval_set(current_state, list)
             } else if func == Expr::Var("lambda".to_string()) {
                 eval_lambda(current_state, list)
+            } else if func == Expr::Var("quote".to_string()) {
+                if list.len() == 1 {
+                    return Ok((list.pop_front().unwrap(), current_state));
+                }
+                return Err((
+                    Error::ArityMismatch("quote".to_string(), list.len(), 1),
+                    current_state,
+                ));
             } else {
                 apply(current_state, func, list)
             }
@@ -549,28 +564,21 @@ fn eval_lambda(state: Memory, list: LinkedList<Expr>) -> Result<(Expr, Memory), 
     let params = list.pop_front().unwrap();
     if let Expr::List(parameters) = params.clone() {
         let bod = list.pop_front().unwrap();
-        if let Expr::List(_body) = bod.clone() {
-            let mut parameters_as_strings = LinkedList::new();
-            for i in parameters {
-                if let Expr::Var(var) = i {
-                    parameters_as_strings.push_back(var);
-                } else {
-                    return Err((
-                        Error::TypeMismatch(String::from("lambda"), i, "Var".to_string(), 1),
-                        state,
-                    ));
-                }
+        let mut parameters_as_strings = LinkedList::new();
+        for i in parameters {
+            if let Expr::Var(var) = i {
+                parameters_as_strings.push_back(var);
+            } else {
+                return Err((
+                    Error::TypeMismatch(String::from("lambda"), i, "Var".to_string(), 1),
+                    state,
+                ));
             }
-            Ok((
-                Expr::Lambda(LambdaExpr::new(parameters_as_strings, bod)),
-                state,
-            ))
-        } else {
-            Err((
-                Error::TypeMismatch(String::from("lambda"), bod, "List".to_string(), 2),
-                state,
-            ))
         }
+        Ok((
+            Expr::Lambda(LambdaExpr::new(parameters_as_strings, bod)),
+            state,
+        ))
     } else {
         Err((
             Error::TypeMismatch(String::from("lambda"), params, "List".to_string(), 1),
@@ -770,7 +778,7 @@ fn execute_lambda(
 
 fn print(x: Result<(Expr, Memory), (Error, Memory)>) {
     match x {
-        Ok((e, m)) => match e {
+        Ok((e, _m)) => match e {
             Expr::Func(_) => println!(
                 "{}",
                 Error::CannotPrint(String::from("Function"))
@@ -785,11 +793,6 @@ fn print(x: Result<(Expr, Memory), (Error, Memory)>) {
                     .red()
                     .bold()
             ),
-
-            Expr::Var(v) => match m.get(&v) {
-                Some(val) => println!("{}", val),
-                None => eprintln!("{}", Error::NotAVariable(v).to_string().red().bold()),
-            },
             _ => println!("{}", e),
         },
         Err((e, _)) => println!("{}", e.to_string().red().bold()),
@@ -1028,7 +1031,10 @@ mod tests {
         let e = eval(p.unwrap(), state);
         match e {
             Ok((val, _)) => Some(val),
-            Err(_) => None,
+            Err(e) => {
+                dbg!(e);
+                None
+            }
         }
     }
 
@@ -1146,6 +1152,71 @@ mod tests {
         assert_eq!(
             Expr::Bool(true),
             eval_or_none(String::from("(set a #t) a")).unwrap()
+        );
+    }
+
+    #[test]
+    fn lambda_identity() {
+        //Identity lambda
+        assert_eq!(
+            Expr::Num(1.0),
+            eval_or_none(String::from("((lambda (x) x) 1)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Num(1.0),
+            eval_or_none(String::from("(set id (lambda (x) x))(id 1)")).unwrap()
+        );
+    }
+
+    #[test]
+    fn lambda_factorial() {
+        assert_eq!(
+            Expr::Num(1.0),
+            eval_or_none(String::from(
+                "(set fact (lambda (x) (if (< x 1) 1 (* x (fact (- x 1)))))) (fact 1)"
+            ))
+            .unwrap()
+        );
+        assert_eq!(
+            Expr::Num(1.0),
+            eval_or_none(String::from(
+                "(set fact (lambda (x) (if (< x 1) 1 (* x (fact (- x 1)))))) (fact 0)"
+            ))
+            .unwrap()
+        );
+        assert_eq!(
+            Expr::Num(6.0),
+            eval_or_none(String::from(
+                "(set fact (lambda (x) (if (< x 1) 1 (* x (fact (- x 1)))))) (fact 3)"
+            ))
+            .unwrap()
+        );
+        assert_eq!(
+            Expr::Num(3628800.0),
+            eval_or_none(String::from(
+                "(set fact (lambda (x) (if (< x 1) 1 (* x (fact (- x 1)))))) (fact 10)"
+            ))
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn quote_test() {
+        assert_eq!(
+            Expr::Bool(true),
+            eval_or_none(String::from("(quote #t)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Num(1.0),
+            eval_or_none(String::from("(quote 1)")).unwrap()
+        );
+        let mut l = LinkedList::new();
+        for x in 1..4 {
+            l.push_back(Expr::Num(f64::from(x)));
+        }
+        assert_eq!(
+            Expr::List(l),
+            eval_or_none(String::from("(quote (1 2 3))")).unwrap()
         );
     }
 }
