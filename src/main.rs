@@ -1121,17 +1121,19 @@ mod tests {
         let state = Memory::new();
         let t = tokenize(s);
         if t.is_err() {
+            println!("{:?}", t);
             return None;
         }
         let p = parse(t.unwrap());
         if p.is_err() {
+            println!("{:?}", p);
             return None;
         }
         let e = eval(p.unwrap(), state);
         match e {
             Ok((val, _)) => Some(val),
             Err(e) => {
-                dbg!(e);
+                println!("{:?}", e);
                 None
             }
         }
@@ -1328,6 +1330,50 @@ mod tests {
         assert_eq!(
             Expr::List(l),
             eval_or_none(String::from("(cons 1 (quote (2 3)))")).unwrap()
+        );
+    }
+
+    #[test]
+    fn car_test() {
+        let mut l = LinkedList::new();
+        for x in 1..4 {
+            l.push_back(Expr::Num(f64::from(x)));
+        }
+        assert_eq!(
+            Expr::List(l),
+            eval_or_none(String::from("(car (quote ((1 2 3) 4 5 6)))")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(true),
+            eval_or_none(String::from("(car (quote (#t #f #f)))")).unwrap()
+        );
+    }
+
+    #[test]
+    fn cdr_test() {
+        let mut l = LinkedList::new();
+        for x in 1..4 {
+            l.push_back(Expr::Num(f64::from(x)));
+        }
+        assert_eq!(
+            Expr::List(l),
+            eval_or_none(String::from("(cdr (quote (0 1 2 3)))")).unwrap()
+        );
+    }
+
+    #[test]
+    fn null_questionmark_test() {
+        assert_eq!(
+            Expr::Bool(true),
+            eval_or_none(String::from("(null? (quote ()))")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(false),
+            eval_or_none(String::from("(null? #t)")).unwrap()
+        );
+        assert_eq!(
+            Expr::Bool(false),
+            eval_or_none(String::from("(null? 42)")).unwrap()
         );
     }
 }
