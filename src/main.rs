@@ -125,6 +125,28 @@ impl Memory {
         values.insert(String::from("PI"), Expr::Num(std::f64::consts::PI));
         // Add Function
         values.insert(
+            String::from("cons"),
+            Expr::Func(|lst| {
+                let mut lst = lst.clone();
+                if lst.len() != 2 {
+                    return Err(Error::ArityMismatch(String::from("cons"), lst.len(), 2));
+                }
+                let first = lst.pop_front().unwrap();
+                let second = lst.pop_front().unwrap();
+                if let Expr::List(mut l) = second {
+                    l.push_front(first);
+                    return Ok(Expr::List(l));
+                } else {
+                    return Err(Error::TypeMismatch(
+                        String::from("cons"),
+                        second,
+                        "List".to_string(),
+                        2,
+                    ));
+                }
+            }),
+        );
+        values.insert(
             String::from("+"),
             Expr::Func(|lst| Memory::math_fn(String::from("+"), lst.clone(), |a, b| a + b)),
         );
@@ -1217,6 +1239,18 @@ mod tests {
         assert_eq!(
             Expr::List(l),
             eval_or_none(String::from("(quote (1 2 3))")).unwrap()
+        );
+    }
+
+    #[test]
+    fn cons_test() {
+        let mut l = LinkedList::new();
+        for x in 1..4 {
+            l.push_back(Expr::Num(f64::from(x)));
+        }
+        assert_eq!(
+            Expr::List(l),
+            eval_or_none(String::from("(cons 1 (quote (2 3)))")).unwrap()
         );
     }
 }
