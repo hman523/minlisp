@@ -753,6 +753,15 @@ fn eval_list(list: LinkedList<Expr>, state: Memory) -> Result<(Expr, Memory), (E
     let mut current_state = state;
     for i in list {
         if let Expr::List(_) = i {
+            /*if let Some(v) = l.front(){
+                if *v == Expr::Var(String::from("quote")) {
+                    if l.len() != 2 {
+                        return Err((Error::ArityMismatch(String::from("quote"), l.len()-1, 1), current_state));
+                    }
+                    l.pop_front().unwrap();
+                    return Ok((l.front().unwrap().clone(), current_state));
+                }
+            }*/
             let evaled = eval(i, current_state);
             match evaled {
                 Ok((e, s)) => {
@@ -781,11 +790,26 @@ fn apply(
     f: Expr,
     params: LinkedList<Expr>,
 ) -> Result<(Expr, Memory), (Error, Memory)> {
-    let params = eval_list(params, state.clone());
-    if params.is_err() {
-        return params;
+    dbg!(&params);
+    let mut new_state = state;
+    let original_params = params.clone();
+    let mut params = LinkedList::new();
+    for i in original_params {
+        let res = eval(i, new_state);
+        let mut val = Expr::Bool(true);
+        if res.is_err() {
+            return Err(res.unwrap_err());
+        }
+        let res = res.unwrap();
+        new_state = res.1;
+        params.push_back(res.0);
     }
-    let (params, new_state) = params.unwrap();
+    //let params = eval_list(params, state.clone());
+    //if params.is_err() {
+    //    return params;
+    //}
+    //let (params, new_state) = params.unwrap();
+    let params = Expr::List(params);
     let params: LinkedList<Expr> = match params {
         Expr::List(l) => l,
         _ => LinkedList::new(),
@@ -805,7 +829,7 @@ fn apply(
         }
         Expr::Lambda(lambda) => execute_lambda(lambda, new_state, &params),
         Expr::List(l) => {
-            let res = eval(Expr::List(l), state);
+            let res = eval(Expr::List(l), new_state);
             if res.is_err() {
                 return Err(res.unwrap_err());
             }
@@ -816,12 +840,12 @@ fn apply(
             let func = new_state.get(&var);
             if func == None {
                 dbg!("Function is none");
-                return Err((Error::NotAProcedure(var), state));
+                return Err((Error::NotAProcedure(var), new_state));
             }
             let func = func.unwrap();
             match func {
                 Expr::List(l) => {
-                    let res = eval(Expr::List(l), state);
+                    let res = eval(Expr::List(l), new_state);
                     if res.is_err() {
                         return Err(res.unwrap_err());
                     }
@@ -832,7 +856,7 @@ fn apply(
                     Ok(e) => Ok((e, new_state)),
                     Err(e) => Err((e, new_state)),
                 },
-                Expr::Lambda(lambda) => execute_lambda(lambda, state, &params),
+                Expr::Lambda(lambda) => execute_lambda(lambda, new_state, &params),
                 _ => Err((Error::NotAProcedure(func.to_string()), new_state)),
             }
         }
@@ -847,6 +871,7 @@ fn execute_lambda(
 ) -> Result<(Expr, Memory), (Error, Memory)> {
     let mut new_state = state.clone();
     let mut params = params.clone();
+    dbg!(&params);
     //First enter new scope
     if lambda.params.len() != params.len() {
         return Err((
