@@ -956,7 +956,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tokenize() {
+    fn tokenize_fn() {
         let empty: Vec<String> = Vec::new();
         assert_eq!(
             tokenize(String::from("1 2 3")).unwrap(),
@@ -994,7 +994,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tokenize_error() {
+    fn tokenize_error() {
         let open_error = Error::OpenParenMissing();
         let close_error = Error::CloseParenMissing();
         assert_eq!(tokenize(String::from("(1 2 3")).unwrap_err(), close_error);
@@ -1005,7 +1005,7 @@ mod tests {
     }
 
     #[test]
-    fn test_type_formating() {
+    fn type_formating() {
         assert_eq!(Expr::Bool(true).to_string(), "#t");
         assert_eq!(Expr::Bool(false).to_string(), "#f");
         assert_eq!(Expr::Str("A".to_string()).to_string(), "A");
@@ -1014,7 +1014,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_expr() {
+    fn parse_expr_fn() {
         assert_eq!(parse_expr(String::from("#t")), Expr::Bool(true));
         assert_eq!(parse_expr(String::from("#f")), Expr::Bool(false));
         assert_eq!(parse_expr(String::from("0")), Expr::Num(0.0));
@@ -1028,7 +1028,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_01() {
+    fn parse_01() {
         let tokens = tokenize(String::from("(1 2 3)"));
         let tokens = match tokens {
             Ok(a) => a,
@@ -1050,7 +1050,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_02() {
+    fn parse_02() {
         let tokens = tokenize(String::from("(1) (2 3)"));
         let tokens = match tokens {
             Ok(a) => a,
@@ -1075,7 +1075,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_03() {
+    fn parse_03() {
         let tokens = tokenize(String::from("((1) 2 3)"));
         let tokens = match tokens {
             Ok(a) => a,
@@ -1100,7 +1100,7 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_get_insert() {
+    fn memory_get_insert() {
         let mut mem = Memory::new();
         if mem.insert(&String::from("a"), Expr::Bool(true)).is_err() {
             panic!("Error should not happen on this insert");
@@ -1109,7 +1109,7 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_insert_twice() {
+    fn memory_insert_twice() {
         let mut mem = Memory::new();
         let first = mem.insert(&String::from("a"), Expr::Bool(true)).unwrap();
         let second = mem.insert(&String::from("a"), Expr::Bool(true));
@@ -1160,7 +1160,7 @@ mod tests {
     }
 
     #[test]
-    fn test_numeric_equality() {
+    fn numeric_equality() {
         assert_eq!(
             Expr::Bool(true),
             eval_or_none(String::from("(= 1 1)")).unwrap()
@@ -1172,7 +1172,7 @@ mod tests {
     }
 
     #[test]
-    fn test_numeric_comparison() {
+    fn numeric_comparison() {
         assert_eq!(
             Expr::Bool(true),
             eval_or_none(String::from("(/= 1 0)")).unwrap()
@@ -1216,7 +1216,7 @@ mod tests {
     }
 
     #[test]
-    fn test_if() {
+    fn if_bif() {
         assert_eq!(
             Expr::Num(1.0),
             eval_or_none(String::from("(if #t 1 2)")).unwrap()
@@ -1244,7 +1244,7 @@ mod tests {
     }
 
     #[test]
-    fn test_set() {
+    fn set_bif() {
         assert_eq!(
             Expr::Num(3.0),
             eval_or_none(String::from("(set a 3)")).unwrap()
@@ -1302,7 +1302,7 @@ mod tests {
     }
 
     #[test]
-    fn quote_test() {
+    fn quote_bif() {
         assert_eq!(
             Expr::Bool(true),
             eval_or_none(String::from("(quote #t)")).unwrap()
@@ -1322,7 +1322,7 @@ mod tests {
     }
 
     #[test]
-    fn cons_test() {
+    fn cons_bif() {
         let mut l = LinkedList::new();
         for x in 1..4 {
             l.push_back(Expr::Num(f64::from(x)));
@@ -1334,7 +1334,7 @@ mod tests {
     }
 
     #[test]
-    fn car_test() {
+    fn car_bif() {
         let mut l = LinkedList::new();
         for x in 1..4 {
             l.push_back(Expr::Num(f64::from(x)));
@@ -1350,7 +1350,7 @@ mod tests {
     }
 
     #[test]
-    fn cdr_test() {
+    fn cdr_bif() {
         let mut l = LinkedList::new();
         for x in 1..4 {
             l.push_back(Expr::Num(f64::from(x)));
@@ -1362,7 +1362,7 @@ mod tests {
     }
 
     #[test]
-    fn null_questionmark_test() {
+    fn null_questionmark_bif() {
         assert_eq!(
             Expr::Bool(true),
             eval_or_none(String::from("(null? (quote ()))")).unwrap()
@@ -1375,5 +1375,14 @@ mod tests {
             Expr::Bool(false),
             eval_or_none(String::from("(null? 42)")).unwrap()
         );
+    }
+
+    #[test]
+    fn create_and_test_len_fn() {
+        //This test was created because of a failed live demo
+        assert_eq!(
+			Expr::Num(3.0),
+			eval_or_none(String::from("(set len (lambda (lst) (if (null? lst) 0 (+ 1 (len (cdr lst)))))) (len (quote (1 2 3)))")).unwrap(),
+		);
     }
 }
