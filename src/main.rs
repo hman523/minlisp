@@ -147,6 +147,32 @@ impl Memory {
             }),
         );
         values.insert(
+            String::from("car"),
+            Expr::Func(|lst| {
+                let mut lst = lst.clone();
+                if lst.len() != 1 {
+                    return Err(Error::ArityMismatch("car".to_string(), lst.len(), 1));
+                }
+                let val = lst.pop_front().unwrap();
+                if let Expr::List(mut l) = val {
+                    if l.len() == 0 {
+                        return Err(Error::ContractViolation(
+                            String::from("car"),
+                            String::from("expected parameter to be list of at least size 1"),
+                        ));
+                    }
+                    return Ok(l.pop_front().unwrap());
+                } else {
+                    return Err(Error::TypeMismatch(
+                        "car".to_string(),
+                        val,
+                        "List".to_string(),
+                        1,
+                    ));
+                }
+            }),
+        );
+        values.insert(
             String::from("+"),
             Expr::Func(|lst| Memory::math_fn(String::from("+"), lst.clone(), |a, b| a + b)),
         );
@@ -330,6 +356,8 @@ enum Error {
     NoFuncGiven(),
     EvalCalledOnNothing(),
     ParameterRepeats(),
+    //fn name, what the parameter didn't do
+    ContractViolation(String, String),
 }
 
 impl std::fmt::Display for Error {
@@ -367,6 +395,13 @@ impl std::fmt::Display for Error {
             Error::NoFuncGiven() => write!(f, "Cannot call eval on empty string"),
             Error::EvalCalledOnNothing() => write!(f, "Cannot call eval on nothing"),
             Error::ParameterRepeats() => write!(f, "Cannot repeat parameter name in lambda"),
+            Error::ContractViolation(name, reason) => write!(
+                f,
+                "Contract violation\n\
+                 \tIn function: {}\n\
+                 \tReason: {}",
+                name, reason
+            ),
         }
     }
 }
