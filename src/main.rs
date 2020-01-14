@@ -133,14 +133,14 @@ impl Memory {
                 }
                 let first = lst.pop_front().unwrap();
                 let second = lst.pop_front().unwrap();
-                if let Expr::List(mut l) = second {
+                if let Expr::Quoted(mut l) = second {
                     l.push_front(first);
                     return Ok(Expr::List(l));
                 } else {
                     return Err(Error::TypeMismatch(
                         String::from("cons"),
                         second,
-                        "List".to_string(),
+                        "Quoted List".to_string(),
                         2,
                     ));
                 }
@@ -154,11 +154,13 @@ impl Memory {
                     return Err(Error::ArityMismatch("car".to_string(), lst.len(), 1));
                 }
                 let val = lst.pop_front().unwrap();
-                if let Expr::List(mut l) = val {
+                if let Expr::Quoted(mut l) = val {
                     if l.len() == 0 {
                         return Err(Error::ContractViolation(
                             String::from("car"),
-                            String::from("expected parameter to be list of at least size 1"),
+                            String::from(
+                                "expected parameter to be a quoted list of at least size 1",
+                            ),
                         ));
                     }
                     return Ok(l.pop_front().unwrap());
@@ -166,7 +168,7 @@ impl Memory {
                     return Err(Error::TypeMismatch(
                         "car".to_string(),
                         val,
-                        "List".to_string(),
+                        "Quoted List".to_string(),
                         1,
                     ));
                 }
@@ -180,7 +182,7 @@ impl Memory {
                     return Err(Error::ArityMismatch("cdr".to_string(), lst.len(), 1));
                 }
                 let val = lst.pop_front().unwrap();
-                if let Expr::List(mut l) = val {
+                if let Expr::Quoted(mut l) = val {
                     if l.len() == 0 {
                         return Err(Error::ContractViolation(
                             String::from("cdr"),
@@ -193,7 +195,7 @@ impl Memory {
                     return Err(Error::TypeMismatch(
                         "cdr".to_string(),
                         val,
-                        "List".to_string(),
+                        "Quoted List".to_string(),
                         1,
                     ));
                 }
@@ -299,7 +301,15 @@ enum Expr {
     Func(fn(&LinkedList<Expr>) -> Result<Expr, Error>),
     Lambda(LambdaExpr),
     List(LinkedList<Expr>),
+    Quoted(LinkedList<Expr>),
     Lines(LinkedList<Expr>),
+}
+
+fn to_quoted(e: Expr) -> Expr {
+    match e {
+        Expr::List(l) => Expr::Quoted(l),
+        _ => e,
+    }
 }
 
 impl std::cmp::PartialEq for Expr {
@@ -312,6 +322,9 @@ impl std::cmp::PartialEq for Expr {
             (Expr::Func(_), Expr::Func(_)) => unimplemented!(),
             (Expr::Lambda(a), Expr::Lambda(b)) => a == b,
             (Expr::List(a), Expr::List(b)) => a == b,
+            (Expr::Quoted(a), Expr::Quoted(b)) => a == b,
+            (Expr::List(a), Expr::Quoted(b)) => a == b,
+            (Expr::Quoted(a), Expr::List(b)) => a == b,
             (Expr::Lines(a), Expr::Lines(b)) => a == b,
             _ => false,
         }
@@ -335,6 +348,7 @@ impl std::fmt::Display for Expr {
                     .replace("]", ")")
                     .replace(",", "")
             ),
+            Expr::Quoted(q) => write!(f, "{}", Expr::List(q)),
             Expr::Lines(l) => write!(f, "{:?}", l),
         }
     }
@@ -359,6 +373,7 @@ fn get_type_name(e: Expr) -> String {
         Expr::Func(_) => "Function",
         Expr::Lambda(_) => "Lambda",
         Expr::List(_) => "List",
+        Expr::Quoted(_) => "Quoted List",
         Expr::Lines(_) => "Lines",
     }
     .to_string()
@@ -616,6 +631,9 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
             }
             result
         }
+        Expr::Quoted(list) => {
+            return Ok((Expr::List(list), current_state));
+        }
         Expr::List(mut list) => {
             let func = list.pop_front();
             if func.is_none() {
@@ -630,6 +648,9 @@ fn eval(expression: Expr, state: Memory) -> Result<(Expr, Memory), (Error, Memor
                 eval_lambda(current_state, list)
             } else if func == Expr::Var("quote".to_string()) {
                 if list.len() == 1 {
+                    if let Expr::List(l) = list.pop_front().unwrap() {
+                        return Ok((Expr::Quoted(l), current_state));
+                    }
                     return Ok((list.pop_front().unwrap(), current_state));
                 }
                 return Err((
@@ -790,7 +811,6 @@ fn apply(
     f: Expr,
     params: LinkedList<Expr>,
 ) -> Result<(Expr, Memory), (Error, Memory)> {
-    dbg!(&params);
     let mut new_state = state;
     let original_params = params.clone();
     let mut params = LinkedList::new();
@@ -839,7 +859,6 @@ fn apply(
         Expr::Var(var) => {
             let func = new_state.get(&var);
             if func == None {
-                dbg!("Function is none");
                 return Err((Error::NotAProcedure(var), new_state));
             }
             let func = func.unwrap();
@@ -871,7 +890,6 @@ fn execute_lambda(
 ) -> Result<(Expr, Memory), (Error, Memory)> {
     let mut new_state = state.clone();
     let mut params = params.clone();
-    dbg!(&params);
     //First enter new scope
     if lambda.params.len() != params.len() {
         return Err((
