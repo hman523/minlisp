@@ -173,6 +173,48 @@ impl Memory {
             }),
         );
         values.insert(
+            String::from("cdr"),
+            Expr::Func(|lst| {
+                let mut lst = lst.clone();
+                if lst.len() != 1 {
+                    return Err(Error::ArityMismatch("cdr".to_string(), lst.len(), 1));
+                }
+                let val = lst.pop_front().unwrap();
+                if let Expr::List(mut l) = val {
+                    if l.len() == 0 {
+                        return Err(Error::ContractViolation(
+                            String::from("cdr"),
+                            String::from("expected parameter to be list of at least size 1"),
+                        ));
+                    }
+                    l.pop_front();
+                    return Ok(Expr::List(l));
+                } else {
+                    return Err(Error::TypeMismatch(
+                        "cdr".to_string(),
+                        val,
+                        "List".to_string(),
+                        1,
+                    ));
+                }
+            }),
+        );
+        values.insert(
+            String::from("null?"),
+            Expr::Func(|lst| {
+                let mut lst = lst.clone();
+                if lst.len() != 1 {
+                    return Err(Error::ArityMismatch(String::from("null?"), lst.len(), 1));
+                }
+                let val = lst.pop_front().unwrap();
+                if let Expr::List(l) = val {
+                    return Ok(Expr::Bool(l.len() == 0));
+                } else {
+                    return Ok(Expr::Bool(false));
+                }
+            }),
+        );
+        values.insert(
             String::from("+"),
             Expr::Func(|lst| Memory::math_fn(String::from("+"), lst.clone(), |a, b| a + b)),
         );
