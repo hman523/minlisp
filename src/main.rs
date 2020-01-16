@@ -155,7 +155,7 @@ impl Memory {
                 }
                 let val = lst.pop_front().unwrap();
                 if let Expr::List(mut l) = val {
-                    if l.len() == 0 {
+                    if l.is_empty() {
                         return Err(Error::ContractViolation(
                             String::from("car"),
                             String::from("expected parameter to be a list of at least size 1"),
@@ -181,7 +181,7 @@ impl Memory {
                 }
                 let val = lst.pop_front().unwrap();
                 if let Expr::List(mut l) = val {
-                    if l.len() == 0 {
+                    if l.is_empty() {
                         return Err(Error::ContractViolation(
                             String::from("cdr"),
                             String::from("expected parameter to be list of at least size 1"),
@@ -208,7 +208,7 @@ impl Memory {
                 }
                 let val = lst.pop_front().unwrap();
                 if let Expr::List(l) = val {
-                    return Ok(Expr::Bool(l.len() == 0));
+                    return Ok(Expr::Bool(l.is_empty()));
                 } else {
                     return Ok(Expr::Bool(false));
                 }
@@ -748,34 +748,6 @@ fn eval_to_bool(e: Expr, state: Memory) -> Option<(bool, Memory)> {
     }
 }
 
-fn eval_list(list: LinkedList<Expr>, state: Memory) -> Result<(Expr, Memory), (Error, Memory)> {
-    let mut returned_list: LinkedList<Expr> = LinkedList::new();
-    let mut current_state = state;
-    for i in list {
-        if let Expr::List(_) = i {
-            let evaled = eval(i, current_state);
-            match evaled {
-                Ok((e, s)) => {
-                    current_state = s;
-                    returned_list.push_back(e);
-                }
-                Err((e, s)) => {
-                    return Err((e, s));
-                }
-            };
-        } else if let Expr::Var(v) = i {
-            let var = current_state.get(&v);
-            match var {
-                Some(e) => returned_list.push_back(e),
-                None => return Err((Error::NotAVariable(v), current_state)),
-            };
-        } else {
-            returned_list.push_back(i);
-        }
-    }
-    Ok((Expr::List(returned_list), current_state))
-}
-
 fn apply(
     state: Memory,
     f: Expr,
@@ -786,7 +758,6 @@ fn apply(
     let mut params = LinkedList::new();
     for i in original_params {
         let res = eval(i, new_state);
-        let mut val = Expr::Bool(true);
         if res.is_err() {
             return Err(res.unwrap_err());
         }
