@@ -1364,4 +1364,15 @@ mod tests {
 			eval_or_none(String::from("(set len (lambda (lst) (if (null? lst) 0 (+ 1 (len (cdr lst)))))) (len (quote (1 2 3)))")).unwrap(),
 		);
     }
+
+    #[test]
+    fn lambda_and_quote() {
+        assert_eq!(
+            Expr::Num(1.0),
+            eval_or_none(String::from(
+                "(set mycar (lambda (lst) (car lst))) (mycar (quote (1 2 3)))"
+            ))
+            .unwrap(),
+        );
+    }
 }
